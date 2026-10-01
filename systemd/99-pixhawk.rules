@@ -1,0 +1,9 @@
+# Stable name for the Pixhawk over USB: /dev/pixhawk
+# Fill idVendor/idProduct from `lsusb` (jetson_inventory.sh) or AUTOPILOT_VERSION
+# vendor_id/product_id (ap_inventory.py). Common values:
+#   Holybro Pixhawk 6C/6X  idVendor=3162 idProduct=004b / 004c
+#   CubePilot CubeOrange   idVendor=2dae idProduct=1016
+#   Generic ArduPilot      idVendor=1209 idProduct=5741
+# Install: sudo cp 99-pixhawk.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+# Then set mav.conf:  Device = /dev/pixhawk
+SUBSYSTEM=="tty", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="XXXX", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="pixhawk", GROUP="dialout", MODE="0660"

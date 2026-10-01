@@ -1,0 +1,14 @@
+[Unit]
+Description=MediaMTX camera streamer (RTSP->WebRTC)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=boat
+WorkingDirectory=/home/boat/mediamtx
+ExecStart=/home/boat/mediamtx/mediamtx /home/boat/mediamtx/cam.yml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

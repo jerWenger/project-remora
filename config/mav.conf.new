@@ -1,0 +1,22 @@
+# Proposed mavlink-router config (replaces mav.conf once 99-pixhawk.rules is installed).
+# One serial owner, three consumers. All UDP endpoints are localhost-only.
+
+[General]
+TcpServerPort = 5760          # QGC over Tailscale: tcp:highfieldboat.tailcacf9.ts.net:5760
+ReportStats = false
+Log = /home/boat/mavlogs      # router tlogs; useful for post-run analysis
+LogMode = while-armed
+
+[UartEndpoint pixhawk]
+Device = /dev/pixhawk
+Baud = 115200
+
+[UdpEndpoint moos]
+Mode = Normal                 # router sends to this address; iArduRoverBridge uses udpin 0.0.0.0 14551
+Address = 127.0.0.1
+Port = 14551
+
+[UdpEndpoint gui]
+Mode = Normal                 # status web GUI / ap_inventory.py --conn udpin:127.0.0.1:14552
+Address = 127.0.0.1
+Port = 14552

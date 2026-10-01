@@ -1,0 +1,16 @@
+[Unit]
+Description=MAVLink router: Pixhawk USB -> QGC (TCP 5760), MOOS bridge (UDP 14551), GUI (UDP 14552)
+After=network-online.target
+Wants=network-online.target
+# Wait for the udev symlink so the Pixhawk is always /dev/pixhawk (see 99-pixhawk.rules)
+BindsTo=dev-pixhawk.device
+After=dev-pixhawk.device
+
+[Service]
+User=boat
+ExecStart=/usr/bin/mavlink-routerd -c /home/boat/mav.conf
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

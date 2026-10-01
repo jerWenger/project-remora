@@ -1,0 +1,24 @@
+# MediaMTX config as deployed on the Jetson (/home/boat/mediamtx/cam.yml).
+# Copy to cam.yml and fill in the camera password; cam.yml is gitignored.
+logLevel: info
+api: true
+apiAddress: 127.0.0.1:9997
+rtsp: true
+rtspAddress: :8554
+rtspTransports: [tcp]
+webrtc: true
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcAdditionalHosts: [100.83.34.69]
+hls: true
+hlsAddress: :8888
+hlsVariant: lowLatency
+paths:
+  cam:
+    source: "rtsp://192.168.1.110:554/stream1?username=admin&password=CAMERA_PASSWORD"
+    rtspTransport: tcp
+    sourceOnDemand: false
+  camhd:
+    source: "rtsp://192.168.1.110:554/stream0?username=admin&password=CAMERA_PASSWORD"
+    rtspTransport: tcp
+    sourceOnDemand: true

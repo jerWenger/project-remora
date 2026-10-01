@@ -1,0 +1,19 @@
+# Captured from the Jetson, not source: keep local only
+logs/
+web/
+
+# Camera config carries the RTSP password; commit the .example instead
+config/cam.yml
+
+# Scratch
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+
+# ArduPilot dataflash / tlogs pulled for analysis (large)
+*.bin.log
+*.BIN
+*.tlog
+!firmware/*.bin
