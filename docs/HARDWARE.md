@@ -42,9 +42,11 @@ Jetson ── Ethernet ──► IP camera 192.168.1.110 (MediaMTX)
 - RC receiver: none (`RC_CHANNELS` count 0) **[inv]**. `RC_PROTOCOLS=1` (all). Free UARTs:
   SERIAL5 (TELEM3) and SERIAL6 (UART4) have protocol −1. TELEM1/2 are set to MAVLink 57600
   and their use is unknown. Plan: ELRS RX on TELEM3, `SERIAL5_PROTOCOL=23`.
-- **No power module**: `POWER_STATUS` has no `BRICK_VALID`, and `Vservo=0` **[inv]**.
-  `BATT_MONITOR=21` (the 6X default for an I2C power module), so `SENSOR_BATTERY` reads BAD and
-  probably blocks arming. Set it to 0 until battery injection (tools/README option 2) exists.
+- **Power module on POWER1 measures the 24 V electronics rail** **[inv]**. With the box unpowered
+  (first inventory) there was no `BRICK_VALID`, which looked like "no power module". With the box
+  powered: `BRICK_VALID`, Vcc 5.00 V, and `BATT_MONITOR=21` (I2C) reads **24.2 V, 0 A**, so it is
+  the 24 V rail, not the 48 V pack. Pack data still comes only from the BMS on the Jetson.
+  Vservo stays 0, which doesn't matter for PWM signal outputs.
 - Outputs **[inv]**:
   - `SERVO9_FUNCTION=73` ThrottleLeft and `SERVO10_FUNCTION=74` ThrottleRight (AUX1/AUX2),
     1000/**1000**/2000 (MIN/TRIM/MAX). With TRIM = MIN the output is forward-only, which matches

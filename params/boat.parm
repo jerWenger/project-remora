@@ -21,10 +21,15 @@ COMPASS_USE2,0
 COMPASS_ORIENT,0
 
 # --- Battery -------------------------------------------------------------
-# No power module fitted (no BRICK_VALID, Vservo=0). The 6X default 21 (I2C PM) reads
-# BAD and blocks arming. The LiTime BMS is read by the Jetson (scripts/battery_litime.py).
-# Reboot needed. Revisit when Lua battery injection (BATT_MONITOR,29) exists.
-BATT_MONITOR,0
+# Battery 1 = the I2C power module on POWER1, which measures the 24 V electronics rail
+# (24.2 V, 2026-10-04), NOT the 48 V pack. It only reads when the electronics box is
+# powered; with the box off it reads BAD and blocks arming, which is correct.
+# The pack is read by the Jetson from the LiTime BMS (scripts/battery_litime.py); pack
+# failsafes need it injected as a second battery (BATT2_MONITOR,29 via Lua) later.
+# No current/capacity meaning on this rail: capacity 0 hides the bogus "% remaining".
+# Reboot needed after BATT_MONITOR changes.
+BATT_MONITOR,21
+BATT_CAPACITY,0
 
 # ==========================================================================
 # PROPOSALS -- commented out on purpose. Enable deliberately, one group at a time.
