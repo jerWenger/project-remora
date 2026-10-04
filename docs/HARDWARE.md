@@ -128,18 +128,18 @@ actuators (LARS = launch-and-recovery?, REEL).
 ## Battery
 LiTime 48 V ComFlex, 16 cells, 100 Ah; RS485 at 19200 8N1 via FTDI on the Jetson;
 decode verified 2026-08-03 **[src: scripts/battery_litime.py]**. Not visible to ArduPilot.
-2026-10-04 **[inv]**: the FTDI is on `/dev/ttyUSB0`, but `battery-litime` has no installed unit
-file and isn't running. `battery.json` is 61 days old, so the GCS battery card shows stale data.
+2026-10-04 **[inv]**: working via `battery-litime.service` on the FTDI's by-id path
+(52.8 V, 48 % SoC, 27 °C, 16 cells ≈ 3.276 V). The earlier "no BMS response" was only the
+reader not running.
 
 ## Jetson **[inv]**
 Orin Nano Super devkit, L4T R36.4.7, Ubuntu 22.04.5, 25 W mode. Tailscale is still relayed via
 DERP nyc, and it logs an iptables `--restore-mark` health warning (legacy iptables, harmless
 for now). Ethernet 192.168.1.50 (camera LAN), Wi-Fi 10.31.128.214. Not installed: MOOS-IvP,
 iArduRoverBridge, mavproxy. `pymavlink` was installed for the inventory.
-`mavlink-routerd` (v4-16) isn't run by systemd. A shell loop
-(`sleep 15 && while true; do mavlink-routerd -c ~/mav.conf >> ~/mav.log; sleep 5; done`,
-probably from cron `@reboot` or rc.local) starts it on `/dev/ttyACM0` and appends to
-`~/mav.log` without limit.
+`mavlink-routerd` (v4-16) runs as `mavlink-router.service` on `/dev/pixhawk` since
+2026-10-04. It replaced a `@reboot` crontab loop in `boat`'s crontab that appended to
+`~/mav.log` without limit (removed).
 
 ## Open questions, in order of importance
 1. Which VCB build is running now? Its USB isn't visible on the Jetson; cable it, then `cat` the new ttyACM.
