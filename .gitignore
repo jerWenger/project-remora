@@ -4,8 +4,20 @@ web/
 
 # Camera config carries the RTSP password; commit the .example instead
 config/cam.yml
+config/*.local.*
 
-# Scratch
+# Credentials that must never land in this public repo
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Scratch / editor
+*.swp
+.vscode/
+.idea/
 __pycache__/
 *.pyc
 .venv/
@@ -16,4 +28,5 @@ venv/
 *.bin.log
 *.BIN
 *.tlog
+*.part
 !firmware/*.bin
