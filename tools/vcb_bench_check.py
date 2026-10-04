@@ -137,22 +137,23 @@ def main():
             v = read_vcb(a.vcb) or {}
             p = v.get("pwm") or {}
             rows.append((name, pwm, out,
-                         p.get("ch1_us"), p.get("ch1_applied_permille"),
-                         p.get("ch2_us"), p.get("ch2_applied_permille")))
+                         p.get("ch1_us"), p.get("ch1_applied_permille"), p.get("ch1_valid"),
+                         p.get("ch2_us"), p.get("ch2_applied_permille"), p.get("ch2_valid")))
             time.sleep(max(0.0, a.hold * 0.4))
         time.sleep(a.hold + 4)                    # let the test time out and disarm
 
-    print("\n%-6s %6s %7s | %8s %8s | %8s %8s" % ("test", "cmd", "PX out", "ch1 us", "ch1 o/oo", "ch2 us", "ch2 o/oo"))
+    print("\n%-6s %6s %7s | %7s %8s %5s | %7s %8s %5s" % (
+        "test", "cmd", "PX out", "ch1 us", "ch1 o/oo", "valid", "ch2 us", "ch2 o/oo", "valid"))
     for r in rows:
-        print("%-6s %6d %7s | %8s %8s | %8s %8s" % tuple("-" if x is None else x for x in r))
+        print("%-6s %6d %7s | %7s %8s %5s | %7s %8s %5s" % tuple("-" if x is None else x for x in r))
 
     # Which VCB channel followed each side: the one whose measured us tracks the command.
     def follower(side):
-        pts = [r for r in rows if r[0] == side and r[3] is not None and r[5] is not None]
+        pts = [r for r in rows if r[0] == side and r[3] is not None and r[6] is not None]
         if len(pts) < 2 or max(r[1] for r in pts) - min(r[1] for r in pts) < 50:
             return None
         span = max(r[1] for r in pts) - min(r[1] for r in pts)
-        moved = [ch for ch, i in (("ch1", 3), ("ch2", 5))
+        moved = [ch for ch, i in (("ch1", 3), ("ch2", 6))
                  if max(r[i] for r in pts) - min(r[i] for r in pts) > span / 2]
         return moved[0] if len(moved) == 1 else None
     fl, fr = follower("LEFT"), follower("RIGHT")
