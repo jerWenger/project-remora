@@ -39,14 +39,15 @@ BATT_CAPACITY,0
 SERVO9_FUNCTION,74
 SERVO10_FUNCTION,73
 # VCB applies (us - 1000) permille and clamps at 1200 us = 200 o/oo (20 %), measured.
-# MAX 1200 maps ArduPilot's full throttle onto that band. MIN = TRIM = 1000 keeps the
-# outputs forward-only and "stopped" when disarmed (VCB reads 1003 us = 3 o/oo; see
-# docs/HARDWARE.md before lowering it).
-SERVO9_MIN,1000
-SERVO9_TRIM,1000
+# MAX 1200 maps ArduPilot's full throttle onto that band. MIN = TRIM keeps the outputs
+# forward-only and is what they hold when disarmed. The VCB reads ~3-4 us high, so 1000
+# out showed as 3 o/oo; 990 out reads 993-994 us = 0 o/oo and is still flagged valid
+# (990 and 995 both tested), giving a true "stopped" with margin against jitter.
+SERVO9_MIN,990
+SERVO9_TRIM,990
 SERVO9_MAX,1200
-SERVO10_MIN,1000
-SERVO10_TRIM,1000
+SERVO10_MIN,990
+SERVO10_TRIM,990
 SERVO10_MAX,1200
 
 # ==========================================================================

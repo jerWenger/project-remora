@@ -60,8 +60,9 @@ Jetson ── Ethernet ──► IP camera 192.168.1.110 (MediaMTX)
     AUX1 → VCB ch1 (right), AUX2 → VCB ch2 (left), i.e. swapped relative to the original
     73/74 assignment; fixed in `params/boat.parm` (SERVO9=74, SERVO10=73).
     The VCB reads ~3–4 µs high and applies (µs − 1000) ‰, clamped at 1200 µs = 200 ‰: the
-    20 % cap and clamp are confirmed. `SERVO9/10_MAX=1200`. Idle 1000 µs reads as 1003 µs = 3 ‰;
-    whether the VCB's "held stopped" arming test accepts that is still unverified.
+    20 % cap and clamp are confirmed. `SERVO9/10_MAX=1200`. Idle 1000 µs read as 1003 µs = 3 ‰, so
+    idle is now 990 µs (`SERVO9/10_MIN=TRIM=990`): reads 993–994 µs, 0 ‰, still `valid`
+    (990 and 995 tested). The left/right swap was re-checked after the change: correct.
   - MAX 2000 puts the whole 0–20 % band in the bottom fifth of the range. Set MAX=1200 once the
     bench test confirms the clamp.
 - Safety posture **[inv]**: `FS_THR_ENABLE=0`, `FS_GCS_ENABLE=0`, `FENCE_ENABLE=0`,
