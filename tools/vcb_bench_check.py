@@ -117,8 +117,10 @@ def main():
         sys.exit("no autopilot heartbeat on %s" % a.conn)
     m.target_system = hb.get_srcSystem()
     m.target_component = hb.get_srcComponent() or 1
+    print("autopilot: sysid %d compid %d type %d base_mode 0x%02x" % (
+        m.target_system, hb.get_srcComponent(), hb.type, hb.base_mode))
     if hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED:
-        sys.exit("vehicle is ARMED: refusing")
+        sys.exit("vehicle is ARMED (per that heartbeat): refusing")
 
     rows = []
     for name, seq, ch in (("LEFT", MOTOR_TEST_THROTTLE_LEFT, a.left_ch),
