@@ -29,6 +29,10 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 os.environ.setdefault("MAVLINK20", "1")  # decode MAVLink2 (servo9..16 extensions)
+# Pixhawk outputs driving each thruster (SERVOn_FUNCTION 73 = ThrottleLeft, 74 = ThrottleRight).
+# Bench check 2026-10-04: AUX2 (SERVO10) -> VCB left, AUX1 (SERVO9) -> VCB right.
+LEFT_CH = int(os.environ.get("GCS_LEFT_CH", "10"))
+RIGHT_CH = int(os.environ.get("GCS_RIGHT_CH", "9"))
 try:
     from pymavlink import mavutil
 except Exception:  # pymavlink is optional
@@ -428,7 +432,8 @@ class MavMonitor:
         out["heading_deg"] = hd
         sv = out.get("servo")
         out["thrusters"] = None if not sv else {
-            "left_us": sv["ch"].get("9"), "right_us": sv["ch"].get("10"),
+            "left_us": sv["ch"].get(str(LEFT_CH)), "right_us": sv["ch"].get(str(RIGHT_CH)),
+            "left_ch": LEFT_CH, "right_ch": RIGHT_CH,
             "src": sv.get("src9_16"), "age_s": sv["age_s"]}
         return out
 
@@ -704,8 +709,8 @@ function renderThrusters(){
   const t=VEH&&VEH.thrusters,c=VCB,online=c&&c.online,stale=c&&c.age_s!=null&&c.age_s>STALE;
   const pw=online&&!stale?c.pwm:null;
   $('thrage').textContent=c&&c.age_s!=null?'VCB '+(stale?'stale ':'')+ago(c.age_s):'';
-  box.append(usBar('LEFT',9,t?t.left_us:null),vcbBar('LEFT',2,pw));
-  box.append(usBar('RIGHT',10,t?t.right_us:null),vcbBar('RIGHT',1,pw));
+  box.append(usBar('LEFT',t?t.left_ch:'?',t?t.left_us:null),vcbBar('LEFT',2,pw));
+  box.append(usBar('RIGHT',t?t.right_ch:'?',t?t.right_us:null),vcbBar('RIGHT',1,pw));
   const st=c&&c.status;
   if(!c||!online){box.append(el('div','alert warn','VCB offline'+(c&&c.msg?': '+c.msg:'')));}
   else if(stale){box.append(el('div','alert warn','VCB data stale ('+ago(c.age_s)+')'));}

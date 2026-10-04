@@ -93,8 +93,8 @@ def main():
     ap.add_argument("--pwm", default="1000,1050,1100,1150,1200,1300", help="comma list of us")
     ap.add_argument("--hold", type=float, default=2.0, help="seconds per step")
     ap.add_argument("--max-bus-v", type=float, default=5.0)
-    ap.add_argument("--left-ch", type=int, default=9, help="Pixhawk output of ThrottleLeft (SITL: 1)")
-    ap.add_argument("--right-ch", type=int, default=10, help="Pixhawk output of ThrottleRight (SITL: 3)")
+    ap.add_argument("--left-ch", type=int, default=10, help="Pixhawk output of ThrottleLeft (SITL: 1); display only")
+    ap.add_argument("--right-ch", type=int, default=9, help="Pixhawk output of ThrottleRight (SITL: 3); display only")
     a = ap.parse_args()
     steps = [int(x) for x in a.pwm.split(",")]
 
@@ -161,7 +161,7 @@ def main():
     if (fl, fr) == ("ch2", "ch1"):
         print("OK: matches the VCB mapping (ch1 = right motor, ch2 = left motor)")
     elif (fl, fr) == ("ch1", "ch2"):
-        print("SWAPPED: swap SERVO9/SERVO10 FUNCTION (73<->74) or the two PWM leads")
+        print("SWAPPED: swap the ThrottleLeft/Right functions (73<->74) of the two outputs, or the PWM leads")
     else:
         print("UNCLEAR: inspect the table")
 
