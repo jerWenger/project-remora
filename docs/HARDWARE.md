@@ -19,7 +19,7 @@ CG01-02 GPS ──CAN1 / DroneCAN──►        │ PWM AUX1 (ThrottleLeft), A
                                  │   ├─ UART7 ──► MCB "LARS"  (STM32U535, DRV8245 ×2, 2.25 A limit)
                                  │   └─ UART3 ──► MCB "REEL"  (same board, 6 A limit, commented out)
                                  │   contactors LSC/HSC, E-stop + TSMS sense, HV bus ADC
-                                 └── USB-CDC ──► Jetson Orin Nano  (CSV telemetry [bin])
+                                 └── UART ─► STLINK-V3 VCP ──USB──► Jetson (/dev/vcb, CSV telemetry)
 Jetson ── USB ──► Pixhawk (/dev/ttyACM0 = if00, mavlink-router TCP 5760) ── Tailscale ──► QGC / laptop
 Jetson ── FTDI FT230X (/dev/ttyUSB0) RS485 ──► LiTime 48 V 100 Ah BMS (battery_litime.py)
 Jetson ── Ethernet ──► IP camera 192.168.1.110 (MediaMTX)
@@ -103,8 +103,10 @@ was likely flashed after this dump. What runs today may differ. The USB-CDC CSV 
 the quickest way to find out: `cat /dev/ttyACM1` on the Jetson will print `mapping,…` and
 live `pwm,…` lines if the bench build (or a descendant) is running.
 **Update 2026-10-04 [inv]:** `ttyACM1` is the Pixhawk's second USB interface, not the VCB.
-No STM32 / VCB USB device shows in the Jetson's `lsusb`, so the VCB is either not cabled to
-the Jetson or was unpowered at the time.
+The flash dump has no USB descriptor strings, so the CSV almost certainly goes out a **UART**,
+read through an **STLINK-V3** probe (serial `003E001C3234511037333934`, VCP on `if01`), now
+pinned as `/dev/vcb`. A UART bridge needs the right baud (unlike CDC); `vcb_logger.py`
+defaults to 115200, unverified. The same probe gives SWD access for reading/flashing the VCB.
 
 ### Consequences for ArduPilot
 - **No reverse** on the current firmware ⇒ a skid-steer boat cannot turn in place or stop

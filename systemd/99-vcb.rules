@@ -1,11 +1,8 @@
-# Stable name for the VCB's USB-CDC telemetry port: /dev/vcb
-# The VCB has never been seen on the Jetson, so these IDs are a GUESS: 0483:5740 is the
-# STM32Cube USB CDC (VCP) default. Confirm with the VCB cabled and powered:
-#   lsusb                                    # look for the new device (STMicroelectronics?)
-#   ls -l /dev/serial/by-id/                 # new entry -> ../../ttyACMn
-#   udevadm info -q property -n /dev/ttyACMn | grep -E 'ID_VENDOR_ID|ID_MODEL_ID|ID_SERIAL_SHORT'
-# then replace idVendor/idProduct below. 0483:5740 is shared by every STM32 CDC device:
-# if a second one is ever plugged in, add  ATTRS{serial}=="<ID_SERIAL_SHORT>"  to pin it.
+# Stable name for the VCB telemetry port: /dev/vcb
+# The VCB's CSV goes out a UART (the flash dump has no USB-CDC descriptor strings), read
+# through the STLINK-V3 debug probe's virtual COM port (interface 01). Seen on the Jetson
+# 2026-10-04 as /dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_003E001C3234511037333934-if01.
+# Pinned by the probe's serial so another ST device can't take the name. If the probe is
+# swapped, read the new serial from `ls -l /dev/serial/by-id/` and replace it here.
 # ID_MM_DEVICE_IGNORE keeps ModemManager from probing the port with AT commands.
-# Install: sudo cp 99-vcb.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="vcb", GROUP="dialout", MODE="0660", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="systemd"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{serial}=="003E001C3234511037333934", SYMLINK+="vcb", GROUP="dialout", MODE="0660", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="systemd"
