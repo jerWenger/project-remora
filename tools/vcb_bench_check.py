@@ -104,11 +104,19 @@ def main():
         sys.exit("refusing to run: %s" % why)
 
     m = mavutil.mavlink_connection(a.conn, source_system=254, source_component=190)
-    hb = m.wait_heartbeat(timeout=10)
+    # Through mavlink-router we also see QGC's heartbeats (QGC flags itself "armed"):
+    # only accept the autopilot's own, and target that system.
+    hb, end = None, time.time() + 10
+    while time.time() < end:
+        h = m.recv_match(type="HEARTBEAT", blocking=True, timeout=1)
+        if h and h.autopilot != mavutil.mavlink.MAV_AUTOPILOT_INVALID \
+                and h.type != mavutil.mavlink.MAV_TYPE_GCS:
+            hb = h
+            break
     if hb is None:
-        sys.exit("no heartbeat on %s" % a.conn)
-    if m.target_component == 0:
-        m.target_component = 1
+        sys.exit("no autopilot heartbeat on %s" % a.conn)
+    m.target_system = hb.get_srcSystem()
+    m.target_component = hb.get_srcComponent() or 1
     if hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED:
         sys.exit("vehicle is ARMED: refusing")
 

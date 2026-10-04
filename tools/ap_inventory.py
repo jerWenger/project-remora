@@ -96,10 +96,14 @@ def git_hash(b):
 def connect(conn, baud):
     print(f"connecting to {conn} ...", flush=True)
     m = mavutil.mavlink_connection(conn, baud=baud, source_system=250, source_component=191)
-    hb = m.wait_heartbeat(timeout=20)
-    if hb is None:
-        raise SystemExit("no heartbeat in 20 s (router down? wrong host? Pixhawk unplugged?)")
-    return m, hb
+    # through the router QGC's heartbeats arrive too; wait for the autopilot's and target it
+    t0 = time.time()
+    while time.time() - t0 < 20:
+        hb = m.recv_match(type="HEARTBEAT", blocking=True, timeout=1)
+        if hb and hb.autopilot != mav.MAV_AUTOPILOT_INVALID and hb.type != mav.MAV_TYPE_GCS:
+            m.target_system, m.target_component = hb.get_srcSystem(), hb.get_srcComponent()
+            return m, hb
+    raise SystemExit("no autopilot heartbeat in 20 s (router down? wrong host? Pixhawk unplugged?)")
 
 
 def request_message(m, msg_id):

@@ -200,8 +200,13 @@ def main():
             return 1
 
     # re-check armed state right before writing
-    hb = m.recv_match(type="HEARTBEAT", blocking=True, timeout=3) or hb
-    if is_armed(hb) and hb.get_srcSystem() == m.target_system and not a.allow_armed:
+    t0 = time.time()
+    while time.time() - t0 < 3:                       # the autopilot's, not QGC's
+        h = m.recv_match(type="HEARTBEAT", blocking=True, timeout=1)
+        if h and h.get_srcSystem() == m.target_system and h.type != mav.MAV_TYPE_GCS:
+            hb = h
+            break
+    if is_armed(hb) and not a.allow_armed:
         raise SystemExit("vehicle armed meanwhile: refusing")
 
     backup = a.backup or os.path.join(REPO, "params", time.strftime("backup_%Y%m%d_%H%M%S.parm", time.gmtime()))
