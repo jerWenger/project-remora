@@ -10,6 +10,7 @@ versioned param file. Everything here is read-only against the vehicle except
 | `ap_params.py` | anywhere | Diff two param dumps; grep params by prefix |
 | `ap_apply.py` | laptop or Jetson | Apply a desired-state `.parm` (e.g. `params/boat.parm`): reads only the named params, prints current → desired, asks y/N, backs up the old values to `params/backup_<UTC>.parm`, writes + verifies each, lists the ones that need a reboot. Refuses if armed |
 | `ap_logs.py` | laptop or Jetson | `list` / `get <id>… \| --latest N \| --all` / `erase --yes-really` dataflash logs over MAVLink into `logs/ap/<UTC>_<id>.BIN`; re-requests dropped chunks, skips logs already downloaded |
+| `vcb_bench_check.py` | Jetson | Dead-bus check of Pixhawk → VCB wiring and the µs → ‰ curve via ArduPilot motor test; refuses unless the VCB reports bus < 5 V and contactors open |
 | `jetson_inventory.sh` | Jetson | L4T/kernel, Tailscale relay state, USB/serial device IDs for a udev rule, who holds the serial port, service states, BMS file freshness, temps, installed Python/MOOS software |
 
 ## Setup (laptop)
