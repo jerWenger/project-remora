@@ -1,0 +1,84 @@
+# HighFieldBoat desired-state parameters (Pixhawk 6X, ArduRover 4.7.0).
+#
+# Only settings that are DECIDED live here, uncommented. Everything else on the
+# vehicle stays as dumped in params/<date>.parm. Apply with:
+#   tools/ap_apply.py params/boat.parm --dry-run
+#   tools/ap_apply.py params/boat.parm
+# Format: NAME,value  ('#' = comment). Proposals are commented out with a reason;
+# enable them one at a time after the physical check named next to them.
+# All names checked against params/2026-10-04.parm (the real dump) unless noted.
+
+# --- Compass -------------------------------------------------------------
+# Without a compass the EKF had no heading and sat in CONST_POS_MODE.
+# COMPASS_ENABLE needs a reboot (ap_apply says so). After that: large-vehicle mag cal.
+COMPASS_ENABLE,1
+# Compass 1 = DroneCAN magnetometer in the GPS puck (DEV_ID 97539, node 125).
+COMPASS_USE,1
+# Compass 2 = Pixhawk 6X internal BMM150, sits next to the motor wiring: don't fuse it.
+COMPASS_USE2,0
+# 0 = no rotation. VERIFY the arrow on the GPS puck points at the bow; if not, fix the
+# mount or set the matching ROTATION_* value here.
+COMPASS_ORIENT,0
+
+# --- Battery -------------------------------------------------------------
+# No power module fitted (no BRICK_VALID, Vservo=0). The 6X default 21 (I2C PM) reads
+# BAD and blocks arming. The LiTime BMS is read by the Jetson (scripts/battery_litime.py).
+# Reboot needed. Revisit when Lua battery injection (BATT_MONITOR,29) exists.
+BATT_MONITOR,0
+
+# ==========================================================================
+# PROPOSALS -- commented out on purpose. Enable deliberately, one group at a time.
+# ==========================================================================
+
+# --- Leftover outputs on MAIN1/MAIN3 --------------------------------------
+# GroundSteering (26) and Throttle (70) idle at 1500 us. Disable ONLY after confirming
+# nothing is wired to MAIN1/MAIN3 (if the VCB were there it would see 20 % thrust).
+# Takes effect live, no reboot.
+#SERVO1_FUNCTION,0
+#SERVO3_FUNCTION,0
+
+# --- Map ArduPilot's full throttle range onto the VCB's usable 1000-1200 us band ---
+# Only after bench-confirming the VCB clamps at 1200 us (docs/HARDWARE.md).
+#SERVO9_MAX,1200
+#SERVO10_MAX,1200
+
+# --- Failsafes ---------------------------------------------------------------
+# GCS failsafe: no GCS heartbeat for FS_TIMEOUT s (1.5) -> FS_ACTION (2 = Hold).
+# Needs a GCS (QGC / MOOS bridge) sending heartbeats whenever the boat is armed.
+#FS_GCS_ENABLE,1
+# Optional: give a lossy tailnet more slack before Hold (dump has 1.5 s).
+#FS_TIMEOUT,5
+
+# Geofence: circle around home (FENCE_TYPE bit1 = 2); add bit2 (polygon, =6 total) once a
+# polygon is uploaded. FENCE_ACTION (Rover): 1 = RTL or Hold, 2 = Hold (safer while RTL is untuned).
+# Pick FENCE_RADIUS for the test area (m).
+#FENCE_ENABLE,1
+#FENCE_TYPE,2
+#FENCE_ACTION,2
+#FENCE_RADIUS,150
+#FENCE_MARGIN,5
+
+# --- ELRS receiver (CRSF) on TELEM3 = SERIAL5 -----------------------------------
+# 23 = RCIN. ArduPilot ignores SERIAL5_BAUD for RCIN: the RC layer sets the UART itself
+# (auto-scans 115200/100000/416666/2000000, CRSF bootstraps at 416666). ELRS receivers
+# default to 420000; RC_OPTIONS bit 13 (8192) "Use 420kbaud for ELRS" makes ArduPilot
+# bootstrap at 420000. The dump has RC_OPTIONS=32 (bit 5), so 32+8192 = 8224.
+# Also bit 9 (512, suppress CRSF mode/rate text for ELRS) is common: 8736.
+# RSSI_TYPE 3 = RSSI/LQ from the receiver protocol. Reboot needed for SERIAL5_*.
+#SERIAL5_PROTOCOL,23
+#RC_OPTIONS,8224
+#RSSI_TYPE,3
+# Then: RC failsafe once the receiver is bound and tested (FS_THR_VALUE is 910 us).
+#FS_THR_ENABLE,1
+
+# --- Flight modes on RC channel 8 (MODE_CH,8 already set) -------------------------
+# Rover mode numbers: 0 Manual, 4 Hold, 15 Guided, 10 Auto, 11 RTL.
+# 3-position switch: low = Manual, mid = Hold, high = Guided (MOOS via iArduRoverBridge).
+# PWM bands: MODE1 <1231, MODE2 1231-1360, MODE3 1361-1490, MODE4 1491-1620,
+# MODE5 1621-1749, MODE6 >1749 -> a 3-pos switch at ~1000/1500/2000 hits 1, 4, 6.
+#MODE1,0
+#MODE2,0
+#MODE3,4
+#MODE4,4
+#MODE5,15
+#MODE6,15

@@ -1,12 +1,15 @@
 # tools/ — discovery scripts
 
-Goal: shrink the list of unknowns about the HighFieldBoat stack before any tuning.
-Everything here is read-only against the vehicle.
+Goal: shrink the list of unknowns about the HighFieldBoat stack, then tune it from a
+versioned param file. Everything here is read-only against the vehicle except
+`ap_apply.py` (writes params, after a diff + confirm + backup) and `ap_logs.py erase`.
 
 | Script | Runs on | What it answers |
 |---|---|---|
 | `ap_inventory.py` | laptop (over tailnet) or Jetson | What autopilot board/firmware, which sensors are present and healthy, GPS state, is an RC receiver bound, is a power module wired, which IMUs/baros stream, full param dump + curated table |
 | `ap_params.py` | anywhere | Diff two param dumps; grep params by prefix |
+| `ap_apply.py` | laptop or Jetson | Apply a desired-state `.parm` (e.g. `params/boat.parm`): reads only the named params, prints current → desired, asks y/N, backs up the old values to `params/backup_<UTC>.parm`, writes + verifies each, lists the ones that need a reboot. Refuses if armed |
+| `ap_logs.py` | laptop or Jetson | `list` / `get <id>… \| --latest N \| --all` / `erase --yes-really` dataflash logs over MAVLink into `logs/ap/<UTC>_<id>.BIN`; re-requests dropped chunks, skips logs already downloaded |
 | `jetson_inventory.sh` | Jetson | L4T/kernel, Tailscale relay state, USB/serial device IDs for a udev rule, who holds the serial port, service states, BMS file freshness, temps, installed Python/MOOS software |
 
 ## Setup (laptop)
@@ -38,6 +41,35 @@ python3 ~/tools/ap_inventory.py --conn tcp:127.0.0.1:5760 --params ~/$(date +%F)
 
 Then copy the outputs back into `params/` here. Commit a dump after every tuning
 session and `ap_params.py diff` them; the param file is the source of truth.
+
+## Tuning session workflow
+
+```sh
+tools/ap_inventory.py --params params/$(date +%F).parm     # 1. dump what's on the vehicle
+$EDITOR params/boat.parm                                    # 2. change the desired state
+tools/ap_apply.py params/boat.parm --dry-run                # 3. review current -> desired
+tools/ap_apply.py params/boat.parm                          # 4. y/N, backup, write, verify
+                                                            #    reboot if it lists [reboot] params
+tools/ap_inventory.py --params params/$(date +%F)_after.parm   # 5. dump again
+tools/ap_params.py diff params/$(date +%F).parm params/$(date +%F)_after.parm   # 6. only what you meant?
+git add params/ && git commit                               # 7. boat.parm + dumps are the record
+```
+
+Undo: `tools/ap_apply.py params/backup_<UTC>.parm` (a backup is a normal `.parm`).
+Proposals sit commented out in `boat.parm`; uncomment one group at a time after the
+physical check written next to it.
+
+Logs after each run (much faster on the Jetson, `--conn tcp:127.0.0.1:5760`, then scp):
+
+```sh
+tools/ap_logs.py list
+tools/ap_logs.py get --latest 1          # -> logs/ap/2026-10-04_16-02-29_7.BIN (gitignored)
+```
+
+Open the `.BIN` in https://plot.ardupilot.org (drag and drop) or `MAVExplorer.py`.
+Logs only exist while armed unless `LOG_DISARMED=1`. The autopilot pauses logging
+during a download. Over the DERP-relayed tailnet expect ~10–30 KiB/s, so a few MB
+per minute of driving takes a few minutes.
 
 ## What to look for in the output
 

@@ -1,0 +1,3 @@
+# Everything SITL writes at runtime: eeprom, dataflash logs, terrain cache,
+# native ArduRover build, fake dashboard state.
+run/

@@ -1,0 +1,28 @@
+# /etc/logrotate.d/boat  (installed by deploy/install.sh)
+# /home/boat is owned by boat, so logrotate must run these as boat ("su").
+
+# Old nohup/shell-loop logs (mav.log, gcs.log, batt.log, mtx.log, ...). Writers keep them
+# open, hence copytruncate. Services now log to the journal; these mostly stop growing.
+/home/boat/*.log {
+    su boat boat
+    weekly
+    maxsize 20M
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+# VCB raw CSVs: one file per connection (vcb_logger.py). Delete any not modified for
+# 30 days (minage + rotate 0 = remove); the file being written is always recent.
+/home/boat/vcblogs/*.csv {
+    su boat boat
+    daily
+    minage 30
+    rotate 0
+    nocreate
+    missingok
+    ifempty
+}

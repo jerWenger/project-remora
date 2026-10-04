@@ -1,0 +1,14 @@
+[Unit]
+Description=LiTime BMS reader (RS485 via FTDI) -> /home/boat/battery.json
+After=local-fs.target
+
+[Service]
+User=boat
+WorkingDirectory=/home/boat
+# Stable FTDI path (not ttyUSB0); the script retries every 3 s while it's absent.
+ExecStart=/usr/bin/python3 -u /home/boat/battery_litime.py --port /dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DU0FF8LR-if00-port0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=VCB USB-CDC telemetry logger (read-only) -> /home/boat/vcb.json + vcblogs/
+After=local-fs.target
+
+[Service]
+User=boat
+WorkingDirectory=/home/boat
+# Waits for /dev/vcb (99-vcb.rules) or an unknown by-id serial device by itself.
+ExecStart=/usr/bin/python3 -u /home/boat/vcb_logger.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

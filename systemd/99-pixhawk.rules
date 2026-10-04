@@ -4,6 +4,8 @@
 #   Holybro Pixhawk 6C/6X  idVendor=3162 idProduct=004b / 004c
 #   CubePilot CubeOrange   idVendor=2dae idProduct=1016
 #   Generic ArduPilot      idVendor=1209 idProduct=5741
+#   THIS BOAT (2026-10-04): Pixhawk6X running ArduPilot enumerates as 1209:5740;
+#   if00 = MAVLink (SERIAL0, ttyACM0), if02 = second MAVLink (SERIAL8, ttyACM1)
 # Install: sudo cp 99-pixhawk.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
 # Then set mav.conf:  Device = /dev/pixhawk
-SUBSYSTEM=="tty", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="XXXX", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="pixhawk", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="5740", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="pixhawk", GROUP="dialout", MODE="0660"

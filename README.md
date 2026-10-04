@@ -33,6 +33,12 @@ Routes:
 | `/`, `/index*` | GET | dashboard HTML |
 | `/api/battery` | GET | battery JSON (reads `battery.json`) |
 | `/api/ptz` | POST | camera pan/tilt/zoom commands |
+| `/api/vehicle` | GET | ArduPilot telemetry via mavlink-router UDP 14552 (monitor only, sends no heartbeat) |
+| `/api/vcb` | GET | VCB state from `vcb.json` (written by `vcb_logger.py`) |
+| `/api/health` | GET | service states, disk, temps, load |
+
+`gcs.py` options: `--port`/`GCS_PORT`, `--mavlink`/`GCS_MAVLINK`, `--state-dir`/`GCS_STATE_DIR`.
+Deploying to the Jetson: [`docs/JETSON.md`](docs/JETSON.md). Laptop simulator: [`sim/README.md`](sim/README.md).
 
 Video is *not* served by `gcs.py`. A separate **MediaMTX** instance
 (`mediamtx.service`, config in `config/cam.yml`) pulls RTSP from an IP camera at
@@ -79,8 +85,8 @@ web/        dashboard-rendered.html  live capture of the served page
 - Both MediaMTX camera paths (`cam`, `camhd`) show `ready: false` — the camera at
   `192.168.1.110` was not reachable, and there are no local `/dev/video*` devices.
   The boat had just rebooted (uptime ~1 min).
-- `cam.yml` contains the camera's RTSP credentials in cleartext. The password is
-  the MD5 of "123456" — a factory default.
+- `cam.yml` contains the camera's RTSP credentials in cleartext (gitignored). The camera
+  still uses its factory-default password; change it.
 - **Not copied** (upstream, not unique): `~/mavlink-router/` (49 MB git clone) and
   the `mediamtx` binary (62 MB) — only their config files were taken.
 - Tailscale reaches this node over the **DERP relay "nyc"**, not a direct path.
