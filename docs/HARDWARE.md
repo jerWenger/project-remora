@@ -13,7 +13,7 @@ Each fact is tagged with how we know it. Upgrade tags as the inventories run.
 ```
 RadioMaster Boxer ─ELRS─► (no receiver yet)
                                      Pixhawk 6X (ArduRover 4.7.0 [inv])
-CG01-02 GPS ──CAN1 / DroneCAN──►        │ PWM AUX1 (ThrottleLeft), AUX2 (ThrottleRight) [inv]
+CG01-02 GPS ──CAN1 / DroneCAN──►        │ PWM AUX1 (ThrottleRight), AUX2 (ThrottleLeft) [inv]
                                         ▼
                                VCB  (STM32H723VG)  ── UART5 ──► ePropulsion protocol converter ──► 2× Navy 6.0
                                  │   ├─ UART7 ──► MCB "LARS"  (STM32U535, DRV8245 ×2, 2.25 A limit)
@@ -48,7 +48,9 @@ Jetson ── Ethernet ──► IP camera 192.168.1.110 (MediaMTX)
   the 24 V rail, not the 48 V pack. Pack data still comes only from the BMS on the Jetson.
   Vservo stays 0, which doesn't matter for PWM signal outputs.
 - Outputs **[inv]**:
-  - `SERVO9_FUNCTION=73` ThrottleLeft and `SERVO10_FUNCTION=74` ThrottleRight (AUX1/AUX2),
+  - Now, after the dead-bus check below: `SERVO9_FUNCTION=74` ThrottleRight on AUX1 and
+    `SERVO10_FUNCTION=73` ThrottleLeft on AUX2, 990/990/1200 (MIN/TRIM/MAX), from `params/boat.parm`.
+  - As found: `SERVO9_FUNCTION=73` ThrottleLeft and `SERVO10_FUNCTION=74` ThrottleRight (AUX1/AUX2),
     1000/**1000**/2000 (MIN/TRIM/MAX). With TRIM = MIN the output is forward-only, which matches
     the VCB. Disarmed (`MOT_SAFE_DISARM=0`) they output TRIM = 1000 µs, which is the VCB's
     "stopped" value, so the VCB arming handshake should pass.
@@ -63,8 +65,6 @@ Jetson ── Ethernet ──► IP camera 192.168.1.110 (MediaMTX)
     20 % cap and clamp are confirmed. `SERVO9/10_MAX=1200`. Idle 1000 µs read as 1003 µs = 3 ‰, so
     idle is now 990 µs (`SERVO9/10_MIN=TRIM=990`): reads 993–994 µs, 0 ‰, still `valid`
     (990 and 995 tested). The left/right swap was re-checked after the change: correct.
-  - MAX 2000 puts the whole 0–20 % band in the bottom fifth of the range. Set MAX=1200 once the
-    bench test confirms the clamp.
 - Safety posture **[inv]**: `FS_THR_ENABLE=0`, `FS_GCS_ENABLE=0`, `FENCE_ENABLE=0`,
   `ARMING_SKIPCHK=64` (skips the RC check), all `MODEn`=Manual, `MODE_CH=8`, safety switch
   disabled (`BRD_SAFETY_DEFLT=0`). Nothing stops the boat on a lost link. This needs fixing
@@ -121,10 +121,11 @@ defaults to 115200, unverified. The same probe gives SWD access for reading/flas
   quickly; Rover's steering authority is only differential forward thrust. Tuning still
   works (Rover handles `MOT_THR_MIN`), but expect large turn radii at low speed.
 - **20 % thrust cap** ⇒ `CRUISE_THROTTLE` will sit near 100 % of the available band.
-  Set `SERVO1/3_MIN=1000`, `SERVO1/3_MAX=1200` so ArduPilot's full range maps to the
-  usable band rather than spending 80 % of its output range on a clamped plateau.
-- The VCB's own startup interlock (charge button, contactors) must complete before
-  ArduPilot output means anything. Needs a physical step or a change to the VCB.
+  `SERVO9/10_MAX=1200` (set 2026-10-04) maps ArduPilot's full range onto the usable band
+  rather than spending 80 % of its output range on a clamped plateau.
+- The VCB's own startup sequence (arming, contactors) must complete before ArduPilot output
+  means anything. In the dumped bench build it starts by itself once both inputs sit at
+  "stopped" for 1 s. The sequence and the operator procedure are in `VCB_BENCH_FIRMWARE.md`.
 - Both are **firmware policy, not hardware limits**. When the boat is closer to the
   water, re-evaluate whether to rebuild the VCB firmware from the GitHub version with
   PWM input, reverse, and a higher cap; the source for the bench build is lost.
@@ -152,9 +153,13 @@ iArduRoverBridge, mavproxy. `pymavlink` was installed for the inventory.
 `~/mav.log` without limit (removed).
 
 ## Open questions, in order of importance
-1. Which VCB build is running now? Its USB isn't visible on the Jetson; cable it, then `cat` the new ttyACM.
-2. What, if anything, is plugged into MAIN1/MAIN3, and does the VCB go to AUX1/AUX2?
+1. Which VCB build is running now? Its telemetry is read through the STLINK-V3 (`/dev/vcb`), and it
+   accepts 990 µs, so it is newer than the flash dump. A fresh dump and a byte diff would settle it
+   (`VCB_BENCH_FIRMWARE.md`).
+2. What, if anything, is plugged into MAIN1/MAIN3? (The VCB is on AUX1/AUX2, confirmed 2026-10-04.)
 3. What exactly is the CG01-02 (label only says that)? Ask node 125 with `GetNodeInfo` over MAVLink-CAN.
 4. What are the pre-arm failure messages (beyond the battery monitor)?
-5. How does the VCB charge/enable interlock get satisfied with no RC receiver present?
+5. How are the E-stop and TSMS wired to the contactors? The firmware reads both but does not act on
+   them (`VCB_BENCH_FIRMWARE.md`). The older question, how the charge/enable interlock is satisfied
+   without an RC receiver, is answered there: the bench build sets both by itself when it arms.
 6. What is on TELEM1/TELEM2 (both set to MAVLink)?

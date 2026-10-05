@@ -132,13 +132,13 @@ running it on the Jetson (where 14552 is the real boat) can't move the boat. Kee
 
 | | Boat | Sim |
 |---|---|---|
-| Thruster outputs | `SERVO9` ThrottleLeft, `SERVO10` ThrottleRight (AUX1/2), 1000/1000/2000 | `SERVO1` ThrottleLeft, `SERVO3` ThrottleRight, 1500/1500/2000 |
+| Thruster outputs | `SERVO9` ThrottleRight, `SERVO10` ThrottleLeft (AUX1/2), 990/990/1200 | `SERVO1` ThrottleLeft, `SERVO3` ThrottleRight, 1500/1500/2000 |
 | Why | VCB is wired to AUX1/2 | SITL physics (`libraries/SITL/SIM_Sailboat.cpp`, `MOTORLEFT_SERVO_CH 0` / `MOTORRIGHT_SERVO_CH 2`) reads outputs 1 and 3, with 1000 = full reverse, 1500 = stop, 2000 = full forward |
-| Forward-only | VCB bench firmware; `MIN = TRIM = 1000` | `MIN = TRIM = 1500`. Same trick: negative thrust maps onto an empty band, so the motors never reverse. The smoke test confirms armed outputs never go below 1500 |
+| Forward-only | VCB bench firmware; `MIN = TRIM = 990` | `MIN = TRIM = 1500`. Same trick: negative thrust maps onto an empty band, so the motors never reverse. The smoke test confirms armed outputs never go below 1500 |
 | 20 % VCB cap (clamp above 1200 µs) | yes | **not modelled** (see below) |
 | Hull / thrust | RHIB + 2× Navy 6.0, unknown curve | generic SITL boat: thrust ∝ throttle, drag ∝ v², ~7 m/s at 50 % throttle. `CRUISE_*` are the boat's (unlearned defaults), so the speed PID corrects a large error |
 | Compass | not yet in use (`COMPASS_USE=0` on the dump) | simulated compass, EKF has yaw |
-| Battery | none visible to ArduPilot (`BATT_MONITOR=21`, no module) | SITL analog battery (`BATT_MONITOR 4`) |
+| Battery | only the 24 V electronics rail (`BATT_MONITOR=21`); the 48 V pack is not visible to ArduPilot | SITL analog battery (`BATT_MONITOR 4`) |
 | RC | no receiver | SITL simulated receiver, all channels 1500 (healthy) |
 | Environment | real | `motorboat.parm` adds wind 3 m/s and waves |
 | Firmware | ArduRover 4.7.0 (1511f271) | 4.7.0-dev master (09c81414). Some names differ: the build uses `ARMING_CHECK`, so `ARMING_SKIPCHK` from the dump is skipped |
@@ -158,17 +158,17 @@ Options, none exact (20 % of the SITL motor isn't 20 % of an ePropulsion Navy 6.
 
 1. **`SERVO1_MAX = SERVO3_MAX = 1600`** (20 % of the 1500–2000 forward band). ArduPilot
    knows about the limit and scales its whole output range into it. This is the sim
-   twin of the *planned* boat config (`SERVO9/10_MAX=1200`, HARDWARE.md). The best
+   twin of the boat's config (`SERVO9/10_MAX=1200`, HARDWARE.md). The best
    choice for tuning.
 2. **`MOT_THR_MAX`**: ArduPilot **clamps it to 30..100** (`AP_MotorsUGV.cpp`), so
    `MOT_THR_MAX=20` really means 30. It also caps only the throttle demand; steering
    mix can still push one motor above it. Rough at best.
-3. **Unaware clamp** (the *current* boat: ArduPilot thinks it has 100 %, the VCB clips
-   at 1200 µs): no param does this. A small Lua script (`SCR_ENABLE 1`, script in
+3. **Unaware clamp** (the boat before 2026-10-04: ArduPilot thought it had 100 %, the VCB
+   clipped at 1200 µs): no param does this. A small Lua script (`SCR_ENABLE 1`, script in
    `sim/run/I<n>/scripts/`) could read `SRV_Channels:get_output_pwm(73/74)` and
    re-emit `min(pwm, 1600)` with `SRV_Channels:set_output_pwm_chan_timeout`, or patch
    `SIM_Sailboat.cpp` to clip the normalised input at 0.2. Use this to see the integrator
-   windup and sluggish turns the real config will have.
+   windup and sluggish turns that config had.
 
 ### RC without a radio
 

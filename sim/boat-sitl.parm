@@ -32,21 +32,21 @@ FRAME_TYPE 0
 # servo output 1 and the RIGHT thruster from servo output 3, and normalises
 # PWM as 1000 = full reverse, 1500 = stop, 2000 = full forward.
 #
-# The real boat drives the VCB from SERVO9 (AUX1, ThrottleLeft=73) and
-# SERVO10 (AUX2, ThrottleRight=74), 1000/1000/2000, forward-only.
+# The real boat drives the VCB from SERVO9 (AUX1, ThrottleRight=74) and
+# SERVO10 (AUX2, ThrottleLeft=73), 990/990/1200, forward-only.
 #
 # Forward-only is reproduced here with MIN = TRIM = 1500: ArduPilot maps
 # negative thrust onto the (empty) MIN..TRIM band, so the sim motors can
-# never reverse, just as with the real MIN = TRIM = 1000. Disarmed
+# never reverse, just as with the real MIN = TRIM = 990. Disarmed
 # (MOT_SAFE_DISARM 0) the outputs sit at TRIM = stop, like the real boat.
 # The VCB's 20 % clamp is NOT modelled -- see sim/README.md.
 # ---------------------------------------------------------------------------
-SERVO1_FUNCTION 73      # ThrottleLeft  (real boat: SERVO9)
+SERVO1_FUNCTION 73      # ThrottleLeft  (real boat: SERVO10)
 SERVO1_MIN 1500
 SERVO1_TRIM 1500
 SERVO1_MAX 2000
 SERVO1_REVERSED 0
-SERVO3_FUNCTION 74      # ThrottleRight (real boat: SERVO10)
+SERVO3_FUNCTION 74      # ThrottleRight (real boat: SERVO9)
 SERVO3_MIN 1500
 SERVO3_TRIM 1500
 SERVO3_MAX 2000

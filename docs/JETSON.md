@@ -13,6 +13,42 @@ The Jetson runs everything from a git checkout at `/home/boat/project-remora`
 | `battery-litime` | BMS → `battery.json` | `/dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DU0FF8LR-if00-port0` |
 | `vcb-logger` | VCB CSV → `vcb.json` + `vcblogs/vcb_*.csv` (read-only) | `/dev/vcb` (`99-vcb.rules`), else autodetect |
 
+## Dashboard and ports
+
+`http://highfieldboat.tailcacf9.ts.net:8080/` is the "Boat GCS" dashboard, served by
+`scripts/gcs.py` (plain Python `http.server`, no framework; the HTML is a string inside the
+script). It shows the live camera with PTZ controls, and cards for the vehicle, battery, VCB
+and host health. It is monitor-only: apart from stream-rate requests it sends nothing to the
+autopilot (no heartbeat, arm, mode or parameter commands).
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/`, `/index*` | GET | dashboard HTML |
+| `/api/vehicle` | GET | ArduPilot telemetry from mavlink-router UDP 14552 |
+| `/api/battery` | GET | battery state (`battery.json`, written by `battery_litime.py`) |
+| `/api/vcb` | GET | VCB state (`vcb.json`, written by `vcb_logger.py`) |
+| `/api/health` | GET | service states, disk, temperatures, load |
+| `/api/ptz` | POST | camera pan/tilt/zoom |
+
+`gcs.py` options: `--port`/`GCS_PORT`, `--mavlink`/`GCS_MAVLINK`, `--state-dir`/`GCS_STATE_DIR`.
+
+Video is not served by `gcs.py`. MediaMTX pulls RTSP from the IP camera at `192.168.1.110` and
+republishes it; the dashboard embeds the WebRTC player.
+
+| Port | Service |
+|---|---|
+| 22 | SSH |
+| 5760 | `mavlink-routerd` TCP server (QGroundControl, tools) |
+| 8080 | dashboard (`gcs.py`) |
+| 8554 / 8888 / 8889 / 1935 | MediaMTX RTSP / HLS / WebRTC / RTMP |
+| 9997 | MediaMTX API (localhost only) |
+| UDP 14551, 14552 | `mavlink-routerd` to the MOOS bridge and the dashboard (localhost only) |
+
+`mavlink-routerd` and the `mediamtx` binary are installed on the Jetson separately; this repo
+holds only their configs.
+
+## Logs
+
 Logs go to the journal (persistent, 500 MB cap). `/etc/logrotate.d/boat` rotates the old
 `~/*.log` files and deletes VCB CSVs untouched for 30 days.
 
@@ -84,6 +120,9 @@ shells if the mosh session dies: `Ctrl-b d` detaches, and running the same comma
 reattaches.
 
 ## Troubleshooting
+
+**Can't reach the boat.** Use the DNS name, not the raw tailnet IP. The link is relayed through
+Tailscale's DERP server, and `tailscale ping` by IP or an ICMP ping can fail while the name works.
 
 **Pixhawk re-enumeration** (reboot from QGC, param reboot, cable bump). The USB device goes
 away and comes back. `BindsTo=dev-pixhawk.device` stops the router, and

@@ -1,93 +1,90 @@
-# 2.733 — HighFieldBoat
+# Project Remora
 
-Boat-side code and configuration for the HighFieldBoat RHIB: Jetson services,
-ArduPilot discovery tools and param dumps, hardware notes. Started from a copy of
-the Jetson `HighFieldBoat` taken on 2026-09-29.
+Boat-side software and documentation for Project Remora, a Highfield RHIB being converted into
+an uncrewed surface vehicle (USV) with twin ePropulsion Navy 6.0 electric outboards. This repo
+holds the Jetson services, the ArduPilot parameter and log tools, a laptop simulator, and the
+hardware notes. On the boat it is checked out at `/home/boat/project-remora`.
 
-Related code lives elsewhere and is **not** in this repo:
-- PCB firmware (VCB, MCB): https://github.com/cttdev (see `docs/HARDWARE.md`)
-- MOOS-IvP missions and `iArduRoverBridge`: `~/moos/mCDR-Plume-Tracking`
+![System overview: operator, boat computer, autopilot, thruster gateway, thrusters](docs/figures/fig1_system_overview.png)
 
-Not tracked here: `logs/`, `web/` (captures from the Jetson) and `config/cam.yml`
-(holds the camera password; use `config/cam.yml.example`).
+## How it fits together
 
-Start with [`docs/HARDWARE.md`](docs/HARDWARE.md) and [`tools/README.md`](tools/README.md).
+- **Operator (shore laptop).** QGroundControl and a web dashboard, connected to the boat over a
+  Tailscale VPN.
+- **Boat computer (Jetson Orin Nano).** Shares the autopilot's MAVLink link between
+  QGroundControl, the dashboard and, later, MOOS-IvP. It also serves the dashboard and the camera
+  video, and logs the battery and the VCB.
+- **Autopilot (Pixhawk 6X, ArduRover 4.7).** Navigation plus the speed and turn-rate loops. It
+  drives the two thrusters as a skid-steer boat.
+- **Thruster gateway (VCB, a custom STM32 board).** Checks the autopilot's two PWM signals, runs
+  the contactors and commands the ePropulsion motors. Its firmware lives in a separate repo.
 
-## Original Jetson snapshot notes
+The network and the control layers are drawn in [`docs/figures/`](docs/figures/).
 
-- **Host:** `highfieldboat.tailcacf9.ts.net` / `100.83.34.69` (tailnet, owner `chaca@`)
-- **Hardware:** NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super
-- **OS:** Ubuntu 22.04 / L4T, kernel `5.15.148-tegra` (built 2025-09-18)
-- **Login:** user `boat`, source dir `/home/boat`
+## Status (2026-10-05)
 
-## The website
+Working:
 
-`http://100.83.34.69:8080/` — **"Boat GCS"** dashboard, served by `scripts/gcs.py`
-(plain Python `BaseHTTPServer`, no framework; HTML is a string literal inside the
-script). Run by the `boat-gcs.service` unit. Dark-themed single page: live camera
-pane on the left, PTZ controls and battery card on the right.
+- Jetson services under systemd: MAVLink router, dashboard, camera stream, battery reader and
+  VCB logger.
+- ArduRover configured as a boat. The left/right thruster mapping and the VCB's 20 % thrust
+  limit were confirmed with the high-voltage bus off on 2026-10-04.
+- Parameter, log and inventory tools, with a desired-state parameter file.
+- A laptop simulator (ArduPilot SITL) that exposes the same MAVLink endpoints as the boat.
 
-Routes:
-| Route | Method | Purpose |
-|---|---|---|
-| `/`, `/index*` | GET | dashboard HTML |
-| `/api/battery` | GET | battery JSON (reads `battery.json`) |
-| `/api/ptz` | POST | camera pan/tilt/zoom commands |
-| `/api/vehicle` | GET | ArduPilot telemetry via mavlink-router UDP 14552 (monitor only, sends no heartbeat) |
-| `/api/vcb` | GET | VCB state from `vcb.json` (written by `vcb_logger.py`) |
-| `/api/health` | GET | service states, disk, temps, load |
+Not done yet:
 
-`gcs.py` options: `--port`/`GCS_PORT`, `--mavlink`/`GCS_MAVLINK`, `--state-dir`/`GCS_STATE_DIR`.
-Deploying to the Jetson: [`docs/JETSON.md`](docs/JETSON.md). Laptop simulator: [`sim/README.md`](sim/README.md).
+- No RC receiver is installed, and the RC, ground-station and geofence failsafes are off.
+  **Nothing stops the boat on a lost link today. Fix this before it goes in the water.**
+- Compass calibration and on-water tuning.
+- MOOS-IvP and `iArduRoverBridge` are not installed on the Jetson.
+- The VCB runs a bench firmware build: forward thrust only, capped at 20 %, and its source is lost.
 
-Video is *not* served by `gcs.py`. A separate **MediaMTX** instance
-(`mediamtx.service`, config in `config/cam.yml`) pulls RTSP from an IP camera at
-`192.168.1.110` and republishes it; the dashboard embeds the WebRTC player.
+## Start here
 
-Other listening ports on the Jetson:
-
-| Port | Service |
+| Read | For |
 |---|---|
-| 8080 | Boat GCS dashboard (`gcs.py`) |
-| 8554 | MediaMTX RTSP |
-| 8888 | MediaMTX HLS (low-latency) |
-| 8889 | MediaMTX WebRTC |
-| 1935 | MediaMTX RTMP |
-| 9997 | MediaMTX API (localhost only) |
-| 5760 | `mavlink-routerd` TCP server |
-| 22 | SSH |
+| [`docs/figures/`](docs/figures/) | Diagrams of the system, the network and the control layers |
+| [`docs/HARDWARE.md`](docs/HARDWARE.md) | What hardware and firmware is on the boat, and how each fact was verified |
+| [`docs/VCB_BENCH_FIRMWARE.md`](docs/VCB_BENCH_FIRMWARE.md) | How the VCB arms and starts the thrusters (reverse-engineered), and the operator procedure |
+| [`docs/JETSON.md`](docs/JETSON.md) | Jetson runbook: deploy, update, verify, troubleshoot, services and ports |
+| [`tools/README.md`](tools/README.md) | Parameter, log and inventory tools, and the tuning-session workflow |
+| [`sim/README.md`](sim/README.md) | Running the boat in simulation on a laptop |
+| [`params/boat.parm`](params/boat.parm) | The ArduPilot parameters we have decided on, each with its reason |
 
-## Contents
+## Using it
+
+Everything on the boat is reachable only from the team's Tailscale network.
+
+| To | Do |
+|---|---|
+| Open the dashboard | `http://highfieldboat.tailcacf9.ts.net:8080/` |
+| Connect QGroundControl | TCP link to `highfieldboat.tailcacf9.ts.net`, port `5760` |
+| Get a shell on the Jetson | `ssh boat@highfieldboat.tailcacf9.ts.net` |
+| Run the simulator | `sim/run_sitl.sh` |
+| Dump the autopilot's parameters | `tools/ap_inventory.py --params params/$(date +%F).parm` |
+| Update the Jetson after a push | `~/project-remora/deploy/update.sh` on the Jetson |
+
+## Repository layout
 
 ```
-scripts/    gcs.py                 dashboard server + PTZ + battery poll
-            battery_litime.py      LiTime BMS reader (the one wired to systemd)
-            battery_rs485.py       RS485 BMS variant
-            battery_teensy.py      Teensy-based battery variant
-            bms_probe.py           BMS discovery/probe utility
-systemd/    boat-gcs.service       runs gcs.py as user boat
-            mediamtx.service       runs mediamtx with cam.yml
-config/     mav.conf               mavlink-router: /dev/ttyACM0 @115200 -> TCP 5760
-            cam.yml                MediaMTX: RTSP pull from cam, WebRTC/HLS/RTMP out
-firmware/   VCB_flash_*.bin        1 MB VCB flash dump, "pre_tolerant_pwm" (2026-08-05)
-logs/       mav.log                MAVLink router log (~1.3 MB, still live)
-            battery.json           last battery state
-            batt.log, gcs.log, mtx.log
-web/        dashboard-rendered.html  live capture of the served page
+scripts/    Jetson services: gcs.py (dashboard), battery_litime.py (BMS reader), vcb_logger.py.
+            battery_rs485.py, battery_teensy.py and bms_probe.py are earlier BMS experiments.
+systemd/    Unit files for the five services, and udev rules for /dev/pixhawk and /dev/vcb
+config/     mav.conf.new (the mavlink-router config that install.sh deploys),
+            mav.conf (the original, kept for reference), cam.yml.example (MediaMTX)
+deploy/     install.sh and update.sh for the Jetson, plus logrotate and journald configs
+tools/      ArduPilot inventory, parameter, log and bench-check scripts
+params/     boat.parm (desired state) and dated parameter dumps
+sim/        ArduPilot SITL launcher, parameter overlay and smoke test
+firmware/   Flash dump of the VCB bench firmware
+docs/       Hardware notes, Jetson runbook, VCB firmware analysis, figures, raw inventories
 ```
 
-## Notes / current state
+Not tracked: `logs/` and `web/` (captures from the Jetson) and `config/cam.yml`, which holds the
+camera password. Use `config/cam.yml.example`.
 
-- `battery.json` reads `{"online": false, "msg": "no BMS response"}` — the BMS was
-  not responding at copy time. Three different battery reader scripts exist
-  (litime / rs485 / teensy), suggesting the interface was still being worked out;
-  `battery-litime.service` is the variant that got a unit file.
-- Both MediaMTX camera paths (`cam`, `camhd`) show `ready: false` — the camera at
-  `192.168.1.110` was not reachable, and there are no local `/dev/video*` devices.
-  The boat had just rebooted (uptime ~1 min).
-- `cam.yml` contains the camera's RTSP credentials in cleartext (gitignored). The camera
-  still uses its factory-default password; change it.
-- **Not copied** (upstream, not unique): `~/mavlink-router/` (49 MB git clone) and
-  the `mediamtx` binary (62 MB) — only their config files were taken.
-- Tailscale reaches this node over the **DERP relay "nyc"**, not a direct path.
-  `tailscale ping` by raw IP can fail while the DNS name works; ICMP ping fails.
+## Related repositories
+
+- VCB and MCB firmware: https://github.com/cttdev (`VCB`, `MCB`)
+- MOOS-IvP missions and `iArduRoverBridge`: the `mCDR-Plume-Tracking` repo

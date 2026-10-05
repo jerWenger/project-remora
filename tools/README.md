@@ -105,13 +105,6 @@ feeds that to ArduPilot today. Three ways forward, cheapest first:
 Start with 1, add 2 once the GUI works. Confirm `SCR_ENABLE` and free flash in
 the param dump before committing to option 2.
 
-## Next: remove the biggest unknowns in order
+## What is still unknown
 
-1. Run both inventories; save outputs under `params/` and `docs/`.
-2. From the banner: pin down the exact flight controller and GPS, write them into
-   a `docs/HARDWARE.md`.
-3. From USB IDs: install the udev rule so the Pixhawk is always `/dev/pixhawk`,
-   and point `mav.conf` at it.
-4. Add a `mavlink-router.service` with a second UDP endpoint
-   (`127.0.0.1:14551`) for `iArduRoverBridge` and a third (`14552`) for the GUI.
-5. Spec an RC receiver matching the transmitter protocol and `RC_PROTOCOLS`.
+The open questions are kept at the end of [`docs/HARDWARE.md`](../docs/HARDWARE.md).
