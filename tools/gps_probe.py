@@ -61,7 +61,10 @@ FIX = {0: "no GPS", 1: "no fix", 2: "2D", 3: "3D", 4: "DGPS", 5: "RTK float", 6:
 
 PARAMS = ["GPS1_TYPE", "GPS2_TYPE", "GPS_AUTO_CONFIG", "GPS_AUTO_SWITCH", "GPS1_GNSS_MODE",
           "GPS1_RATE_MS", "EK3_SRC1_YAW", "EK3_SRC1_POSXY", "EK3_SRC1_VELXY",
-          "SERIAL_PASS1", "SERIAL_PASS2", "SERIAL_PASSTIMO", "BRD_SER1_RTSCTS", "BRD_SER2_RTSCTS"]
+          "SERIAL_PASS1", "SERIAL_PASS2", "SERIAL_PASSTIMO", "BRD_SER1_RTSCTS", "BRD_SER2_RTSCTS",
+          "GPS1_MB_TYPE", "GPS1_MB_OFS_X", "GPS1_MB_OFS_Y", "GPS1_MB_OFS_Z",
+          "GPS1_POS_X", "GPS1_POS_Y", "GPS1_POS_Z", "GPS2_POS_X", "GPS2_POS_Y", "GPS2_POS_Z"]
+MB_TYPES = {17, 18, 22, 23, 25, 26}      # types whose yaw goes through calculate_moving_base_yaw()
 for _n in range(9):
     PARAMS += [f"SERIAL{_n}_PROTOCOL", f"SERIAL{_n}_BAUD"]
 
@@ -147,7 +150,25 @@ def show_config(p):
     if len(gps_ports) > 1 and slots and slots[0] in SERIAL_NEEDED and len(slots) > 1 and slots[1] == 0:
         print(f"  - If the receiver is on SERIAL{gps_ports[1]}: set SERIAL{gps_ports[0]}_PROTOCOL=-1 (empty connector) so "
               f"SERIAL{gps_ports[1]} becomes the first GPS port, then reboot.")
-    if yaw in (2, 3) and not any(t in (17, 18, 22, 23, 25, 26) for t in slots):
+    if slots and slots[0] in MB_TYPES:
+        # yaw is only accepted if the reported baseline matches the offset ArduPilot knows about
+        mbt = ival(p, "GPS1_MB_TYPE", 0)
+        if mbt == 1:
+            ofs = [p.get(f"GPS1_MB_OFS_{a}", (0.0,))[0] for a in "XYZ"]
+            src = "GPS1_MB_OFS_X/Y/Z"
+        else:
+            ofs = [p.get(f"GPS2_POS_{a}", (0.0,))[0] - p.get(f"GPS1_POS_{a}", (0.0,))[0] for a in "XYZ"]
+            src = "GPS2_POS minus GPS1_POS (GPS1_MB_TYPE=0)"
+        length = sum(v * v for v in ofs) ** 0.5
+        print(f"  GPS1_MB_TYPE = {mbt}   antenna offset from {src} = ({ofs[0]:.2f}, {ofs[1]:.2f}, {ofs[2]:.2f}) m, length {length:.2f} m")
+        if length < 0.05:
+            print("  - ANTENNA OFFSET IS ZERO: moving-baseline yaw is discarded until ArduPilot knows the antenna spacing. "
+                  "Set GPS1_MB_TYPE=1, reboot, then GPS1_MB_OFS_X/Y/Z = position of the 2nd (slave) antenna relative to "
+                  "the 1st (master) in metres, body frame (X forward, Y right, Z down), and reboot again.")
+        else:
+            print("  - Offset length must match the baseline the receiver reports (#UNIHEADINGA; --probe shows it) "
+                  "to within ~20 %, or yaw is rejected.")
+    if yaw in (2, 3) and not any(t in MB_TYPES for t in slots):
         print("  - EK3_SRC1_YAW wants GPS yaw. No slot is a moving-baseline type, so yaw only works if the receiver "
               "sends $GxHDT/$GxTHS (the NMEA driver uses those); the probe lists the sentences it sees.")
     if ival(p, "SERIAL_PASS2", -1) != -1:

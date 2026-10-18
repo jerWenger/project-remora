@@ -29,6 +29,17 @@ GPS2_TYPE,0
 SERIAL1_PROTOCOL,2
 SERIAL1_BAUD,57
 # EK3_SRC1_YAW,2 (GPS) was set by the guide and is what we want with a dual-antenna receiver.
+# Moving-baseline yaw is REJECTED until ArduPilot knows the antenna spacing: it compares the
+# baseline the receiver reports against this offset (~20 % tolerance). MB_TYPE 0 derives it
+# from GPS2_POS - GPS1_POS (both zero here) => length 0 => yaw=65535 (2026-10-18).
+# MB_TYPE 1 uses GPS1_MB_OFS_*, which only appear after MB_TYPE is 1 and a reboot.
+GPS1_MB_TYPE,1
+# Position of the 2nd (slave, ANT2) antenna relative to the 1st (master, ANT1), metres,
+# body frame: X forward, Y right, Z down. MEASURE centre to centre, then uncomment.
+# If the heading comes out 180 deg off, ANT1/ANT2 are swapped: swap the cables.
+#GPS1_MB_OFS_X,0.00
+#GPS1_MB_OFS_Y,0.00
+#GPS1_MB_OFS_Z,0.00
 
 # --- Compass -------------------------------------------------------------
 # NOTE 2026-10-18: the DroneCAN puck (compass 1 below) is unplugged while the UM982 is
