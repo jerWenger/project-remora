@@ -163,13 +163,28 @@ def watch_gps(m, seconds):
                                 mav.MAV_CMD_SET_MESSAGE_INTERVAL, 0, msg_id, 500000, 0, 0, 0, 0, 0)
     m.mav.request_data_stream_send(m.target_system, m.target_component,
                                    mav.MAV_DATA_STREAM_EXTENDED_STATUS, 2, 1)
-    seen, t0 = {}, time.time()
+    seen, types, t0, last_req = {}, {}, time.time(), 0
     while time.time() - t0 < seconds:
-        msg = m.recv_match(type=("GPS_RAW_INT", "GPS2_RAW"), blocking=True, timeout=1)
-        if msg and msg.get_srcSystem() == m.target_system:
+        if time.time() - last_req >= 1:
+            # a GCS heartbeat so the router routes to us, then a one-shot request per second:
+            # works even if the stream commands above are ignored or not forwarded
+            m.mav.heartbeat_send(mav.MAV_TYPE_GCS, mav.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+            m.mav.command_long_send(m.target_system, m.target_component,
+                                    mav.MAV_CMD_REQUEST_MESSAGE, 0, 24, 0, 0, 0, 0, 0, 0)
+            last_req = time.time()
+        msg = m.recv_match(blocking=True, timeout=0.5)
+        if not msg or msg.get_srcSystem() != m.target_system:
+            continue
+        types[msg.get_type()] = types.get(msg.get_type(), 0) + 1
+        if msg.get_type() in ("GPS_RAW_INT", "GPS2_RAW"):
             seen[msg.get_type()] = msg
     if not seen:
-        print("  no GPS_RAW_INT at all (stream not requested? QGC usually requests it; try again)")
+        print("  no GPS_RAW_INT even when requested once a second.")
+        print("  messages from the autopilot meanwhile: " + (", ".join(f"{k}x{v}" for k, v in sorted(types.items())) or "NONE"))
+        if not types:
+            print("  -> not even HEARTBEAT: the router is not passing broadcasts to this client. Check `pgrep -af mavlink-routerd` (two routers?)")
+        elif "COMMAND_ACK" in types:
+            print("  -> the autopilot answered the request but no GPS_RAW_INT followed: paste this output.")
     for k, msg in seen.items():
         ft = msg.fix_type
         yaw = getattr(msg, "yaw", 0)
