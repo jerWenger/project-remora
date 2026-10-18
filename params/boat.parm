@@ -8,7 +8,28 @@
 # enable them one at a time after the physical check named next to them.
 # All names checked against params/2026-10-04.parm (the real dump) unless noted.
 
+# --- GPS: Unicore UM982 (ArduSimple simpleRTK3B) on the GPS2 connector = SERIAL4 ----
+# Verified 2026-10-18 with tools/gps_probe.py --probe --port 4: the receiver sends
+# $GNGGA/$GNRMC/$GNHDT at 115200 on SERIAL4. Do NOT put it on TELEM1: its stream keeps
+# the Pixhawk 6X in the bootloader at power-up (board enumerates as PX4_BL, never boots).
+# GPS slot N reads only the Nth SERIALn with protocol 5, so the empty GPS1 connector
+# (SERIAL3) must be disabled or GPS1 listens there and never sees SERIAL4. Reboot after.
+SERIAL3_PROTOCOL,-1
+SERIAL4_PROTOCOL,5
+SERIAL4_BAUD,115
+# 24 = UnicoreNMEA (the guide's value). The CAN puck (was GPS1_TYPE,9) is unplugged.
+GPS1_TYPE,24
+GPS2_TYPE,0
+# TELEM1 back to MAVLink after the guide set it to GPS.
+SERIAL1_PROTOCOL,2
+SERIAL1_BAUD,57
+# EK3_SRC1_YAW,2 (GPS) was set by the guide; the NMEA driver takes yaw from $GNHDT, so it
+# may just work. If "GPS yaw" never appears, try GPS1_TYPE,25 (UnicoreMovingBaselineNMEA)
+# with GPS_AUTO_CONFIG,1 so ArduPilot configures the UM982 itself.
+
 # --- Compass -------------------------------------------------------------
+# NOTE 2026-10-18: the DroneCAN puck (compass 1 below) is unplugged while the UM982 is
+# in. With GPS yaw working the compass matters less; revisit COMPASS_USE/ORIENT then.
 # Without a compass the EKF had no heading and sat in CONST_POS_MODE.
 # COMPASS_ENABLE needs a reboot (ap_apply says so). After that: large-vehicle mag cal.
 COMPASS_ENABLE,1
