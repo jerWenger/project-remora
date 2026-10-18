@@ -214,8 +214,13 @@ def probe_port(m, p, port, tty, bauds, seconds):
                 break
     finally:
         print("  restoring SERIAL_PASS* ...", end=" ", flush=True)
-        ok = all(write_one(m, n, orig[n][0], orig[n][1]) is not None for n in orig)
-        print("ok" if ok else "FAILED: set SERIAL_PASS2=-1 by hand in QGC")
+        # SERIAL_PASS2 first: that is the one that keeps the GPS driver off its port
+        ok = all(write_one(m, n, orig[n][0], orig[n][1], retries=6, timeout=3.0) is not None
+                 for n in ("SERIAL_PASS2", "SERIAL_PASS1", "SERIAL_PASSTIMO") if n in orig)
+        print("ok" if ok else "FAILED")
+        if not ok:
+            raise SystemExit("param writes are not being acknowledged. In QGC set SERIAL_PASS2=-1 and "
+                             "SERIAL_PASS1=0, reboot, then run again with --port <n> for one port only.")
     return results
 
 
@@ -282,6 +287,9 @@ def main():
         return 0
     if armed:
         raise SystemExit("armed: ArduPilot disables serial passthrough while armed; disarm first")
+    if ival(p, "SERIAL_PASS2", -1) != -1:
+        raise SystemExit("SERIAL_PASS2 is already set (leftover from an earlier run?). Set it to -1 in QGC, "
+                         "reboot, then run again; otherwise the restore at the end would re-save the leftover.")
     ports = a.port or gps_ports
     if not ports:
         raise SystemExit("no port to tap: no SERIALn has protocol 5 and --port not given")
