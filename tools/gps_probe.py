@@ -126,11 +126,23 @@ def show_config(p):
             print(f"  - GPS{i} = NOVA expects NovAtel/Unicore binary (AA 44 12). NMEA text will not be parsed.")
         if t in (24, 25) and ival(p, "GPS_AUTO_CONFIG", 1) == 0:
             print(f"  - GPS{i} Unicore driver needs GPS_AUTO_CONFIG=1: it sends the CONFIG/GPGGA/AGRICA commands itself.")
-    if len(gps_ports) > 1:
-        print(f"  - {len(gps_ports)} ports carry the GPS protocol ({', '.join(PORT_NAMES[n] for n in gps_ports)}). "
-              "The GPS driver cycles through each at each baud, so first detection can take 30-60 s after boot.")
+    # Slot N reads the Nth SERIALn (lowest n first) that has protocol GPS. Nothing else.
+    for i, t in enumerate(slots, 1):
+        if t in SERIAL_NEEDED:
+            if i <= len(gps_ports):
+                n = gps_ports[i - 1]
+                print(f"  - GPS{i} reads ONLY SERIAL{n} ({PORT_NAMES.get(n, '?')}). A receiver on any other port is never seen.")
+            else:
+                print(f"  - GPS{i} is a serial type but there is no {i}{'st' if i == 1 else 'nd'} port with protocol 5 for it.")
+    for i, n in enumerate(gps_ports, 1):
+        if i > len(slots) or slots[i - 1] not in SERIAL_NEEDED:
+            print(f"  - SERIAL{n} ({PORT_NAMES.get(n, '?')}) has protocol 5 but GPS{i} is not a serial type, so nobody reads it.")
+    if len(gps_ports) > 1 and slots and slots[0] in SERIAL_NEEDED and len(slots) > 1 and slots[1] == 0:
+        print(f"  - If the receiver is on SERIAL{gps_ports[1]}: set SERIAL{gps_ports[0]}_PROTOCOL=-1 (empty connector) so "
+              f"SERIAL{gps_ports[1]} becomes the first GPS port, then reboot.")
     if yaw in (2, 3) and not any(t in (17, 18, 22, 23, 25, 26) for t in slots):
-        print("  - EK3_SRC1_YAW wants GPS yaw but no GPS slot is a dual-antenna/moving-baseline type, so there will never be a yaw.")
+        print("  - EK3_SRC1_YAW wants GPS yaw. No slot is a moving-baseline type, so yaw only works if the receiver "
+              "sends $GxHDT/$GxTHS (the NMEA driver uses those); the probe lists the sentences it sees.")
     if ival(p, "SERIAL_PASS2", -1) != -1:
         print("  - SERIAL_PASS2 is set: passthrough is ON and the GPS driver does not own that port. Set SERIAL_PASS2=-1 and reboot.")
     return gps_ports
@@ -242,9 +254,18 @@ def verdict(port, results, p, baud_cfg):
                   "first see *something* it recognises.")
         if k in ("NMEA", "UNICORE-ASCII") and not any(t in NMEA_TYPES or t == 1 for t in slot_types):
             print("  - Receiver sends NMEA but no GPS slot is an NMEA type. Set GPS1_TYPE=24 (UnicoreNMEA) or 25 (moving baseline) and reboot.")
-        if k in ("NMEA", "UNICORE-ASCII") and any(t in NMEA_TYPES or t == 1 for t in slot_types):
-            print("  - Config and data agree. If GPS_RAW_INT still shows fix 0 after a reboot, the GPS driver may be stuck on a "
-                  "different GPS port or slot: set every other SERIALn_PROTOCOL=5 port to -1 and GPS2_TYPE=0, reboot, retry.")
+        gps_ports = [n for n in range(9) if ival(p, f"SERIAL{n}_PROTOCOL") == PROTO_GPS]
+        reader = next((i for i, n in enumerate(gps_ports, 1) if n == port), None)
+        read_by = reader is not None and reader <= len(slot_types) and slot_types[reader - 1] in SERIAL_NEEDED
+        if not read_by:
+            others = [n for n in gps_ports if n < port]
+            print(f"  - BUT no GPS slot reads SERIAL{port}: it is GPS port #{reader} and GPS{reader}_TYPE is "
+                  f"{slot_types[reader - 1] if reader and reader <= len(slot_types) else 'unset'}. "
+                  + (f"Set SERIAL{others[0]}_PROTOCOL=-1 (nothing useful is on it) so SERIAL{port} becomes GPS port #1, "
+                     "then reboot." if others else f"Set GPS{reader}_TYPE for this receiver and reboot."))
+        elif k in ("NMEA", "UNICORE-ASCII") and any(t in NMEA_TYPES or t == 1 for t in slot_types):
+            print("  - Config and data agree. If GPS_RAW_INT still shows fix 0 after a reboot, watch the boot messages "
+                  "for 'GPS 1: detected' and paste them.")
     elif kinds <= {"NOTHING"}:
         print("  - Not one byte at any baud: nothing is reaching this port. Check the receiver has power (LED), "
               "receiver TX -> Pixhawk RX (pin 3 on the 6-pin), and that the cable is on the UM982 COM port the guide configured, "
