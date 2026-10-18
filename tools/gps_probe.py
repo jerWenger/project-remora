@@ -30,7 +30,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ap_apply import connect, is_armed, read_named, write_one  # noqa: E402
+from ap_apply import connect, is_armed, read_named, write_one, mav  # noqa: E402
 
 try:
     import serial
@@ -79,6 +79,13 @@ def baud_hz(v):
     return v if v > 2000 else {1: 1200, 2: 2400, 4: 4800, 9: 9600, 19: 19200, 38: 38400, 57: 57600,
                                 111: 111100, 115: 115200, 230: 230400, 256: 256000, 460: 460800,
                                 500: 500000, 921: 921600, 1500: 1500000, 2000: 2000000}.get(v, v * 100)
+
+
+def baud_param(hz):
+    """Inverse of baud_hz: the SERIALn_BAUD value for a real baud (230400 -> 230)."""
+    return {1200: 1, 2400: 2, 4800: 4, 9600: 9, 19200: 19, 38400: 38, 57600: 57, 111100: 111,
+            115200: 115, 230400: 230, 256000: 256, 460800: 460, 500000: 500, 921600: 921,
+            1500000: 1500, 2000000: 2000}.get(hz, hz)
 
 
 def show_config(p):
@@ -150,6 +157,12 @@ def show_config(p):
 
 def watch_gps(m, seconds):
     print(f"\n== GPS_RAW_INT / GPS2_RAW for {seconds} s ==")
+    # Nothing streams unless a GCS asked for it; ask for 2 Hz ourselves (both the modern and the old way)
+    for msg_id in (24, 124):                           # GPS_RAW_INT, GPS2_RAW
+        m.mav.command_long_send(m.target_system, m.target_component,
+                                mav.MAV_CMD_SET_MESSAGE_INTERVAL, 0, msg_id, 500000, 0, 0, 0, 0, 0)
+    m.mav.request_data_stream_send(m.target_system, m.target_component,
+                                   mav.MAV_DATA_STREAM_EXTENDED_STATUS, 2, 1)
     seen, t0 = {}, time.time()
     while time.time() - t0 < seconds:
         msg = m.recv_match(type=("GPS_RAW_INT", "GPS2_RAW"), blocking=True, timeout=1)
@@ -179,6 +192,12 @@ def classify(buf):
     if nmea:
         names = sorted({b"$" + a for a in set(re.findall(rb"\$([A-Z]{5,8}),", buf))})
         detail = "sentences: " + " ".join(n.decode() for n in names[:12])
+        # Unicore's own ASCII logs ride alongside NMEA; type 25 takes yaw from #UNIHEADINGA
+        uni = sorted(set(re.findall(rb"#([A-Z]{4,12}),", buf)))
+        if uni:
+            detail += "  unicore: " + " ".join("#" + n.decode() for n in uni[:8])
+            if not any(n.startswith(b"UNIHEADING") for n in uni):
+                detail += "  (no #UNIHEADINGA: GPS1_TYPE 25 cannot get yaw from this)"
         # heading sentences: show one so an empty "$GNHDT,,T" (no heading solution) is visible
         hdt = re.findall(rb"\$G[A-Z]{1,2}(?:HDT|THS),[^\r\n]*", buf)
         if hdt:
@@ -258,7 +277,7 @@ def verdict(port, results, p, baud_cfg):
     if good:
         k = results[good]
         if good != baud_cfg:
-            print(f"  - The receiver talks at {good}, but SERIAL{port}_BAUD is {baud_cfg}. Set SERIAL{port}_BAUD={good // 100 if good >= 9600 else good} and reboot.")
+            print(f"  - The receiver talks at {good}, but SERIAL{port}_BAUD is {baud_cfg}. Set SERIAL{port}_BAUD={baud_param(good)} and reboot.")
         else:
             print(f"  - Baud {good} matches SERIAL{port}_BAUD. Bytes are arriving and framed correctly.")
         slot_types = [ival(p, n) for n in ("GPS1_TYPE", "GPS2_TYPE") if n in p]

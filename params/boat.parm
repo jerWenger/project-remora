@@ -16,16 +16,19 @@
 # (SERIAL3) must be disabled or GPS1 listens there and never sees SERIAL4. Reboot after.
 SERIAL3_PROTOCOL,-1
 SERIAL4_PROTOCOL,5
-SERIAL4_BAUD,115
-# 24 = UnicoreNMEA (the guide's value). The CAN puck (was GPS1_TYPE,9) is unplugged.
-GPS1_TYPE,24
+# 25 = UnicoreMovingBaselineNMEA with auto-config: ArduPilot configures the UM982 itself
+# (it moves the receiver to 230400 and enables #UNIHEADINGA, which is where yaw comes from).
+# Type 24 + AUTO_CONFIG 0 gave position but yaw=65535 (2026-10-18). Probe after the change:
+# receiver at 230400, $GNHDT,4.47,T populated, so SERIAL4_BAUD follows it.
+GPS1_TYPE,25
+GPS_AUTO_CONFIG,1
+SERIAL4_BAUD,230
+# The CAN puck (was GPS1_TYPE,9) is unplugged.
 GPS2_TYPE,0
 # TELEM1 back to MAVLink after the guide set it to GPS.
 SERIAL1_PROTOCOL,2
 SERIAL1_BAUD,57
-# EK3_SRC1_YAW,2 (GPS) was set by the guide; the NMEA driver takes yaw from $GNHDT, so it
-# may just work. If "GPS yaw" never appears, try GPS1_TYPE,25 (UnicoreMovingBaselineNMEA)
-# with GPS_AUTO_CONFIG,1 so ArduPilot configures the UM982 itself.
+# EK3_SRC1_YAW,2 (GPS) was set by the guide and is what we want with a dual-antenna receiver.
 
 # --- Compass -------------------------------------------------------------
 # NOTE 2026-10-18: the DroneCAN puck (compass 1 below) is unplugged while the UM982 is
