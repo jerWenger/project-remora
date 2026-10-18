@@ -14,6 +14,14 @@ config/*.local.*
 id_rsa*
 id_ed25519*
 
+# MOOS logs and nsplug output anywhere in the tree (moos-ivp-remora/ has its own too)
+*.alog
+*.blog
+*.ylog
+*.klog
+targ_*
+.LastOpenedMOOSLogDirectory
+
 # Scratch / editor
 *.swp
 .vscode/

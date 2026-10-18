@@ -20,9 +20,10 @@ OUT = Path(__file__).resolve().parent
 FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
 INK, MUTED, GREY = "#1b1f24", "#57606a", "#6e7781"
 NODE_FILL, NODE_EDGE = "#f2f4f7", "#8c959f"
-CMD, SAFE = "#0a58a6", "#b3261e"
+CMD, SAFE, PWR, AC, ETH = "#0a58a6", "#b3261e", "#c2410c", "#6f42c1", "#0b7a3b"
 # kind -> (colour, stroke width, arrowhead length, arrowhead width)
-KINDS = {"data": (GREY, 1.4, 9, 7), "cmd": (CMD, 2.4, 11, 8.5), "safe": (SAFE, 1.8, 10, 8)}
+KINDS = {"data": (GREY, 1.4, 9, 7), "cmd": (CMD, 2.4, 11, 8.5), "safe": (SAFE, 1.8, 10, 8),
+         "pwr": (PWR, 2.6, 10, 8), "ac": (AC, 2.0, 10, 8), "eth": (ETH, 1.8, 9, 7)}
 
 
 def tw(s, size, bold=False):
@@ -86,8 +87,10 @@ class Fig:
         if planned:
             self.tag(x + w - 10, y)
 
-    def proc(self, x, y, w, h, name, desc=(), planned=False, fill="#ffffff", stroke=GREY, name_size=14.5, tag_at=None):
-        """A process (white) or, through device(), a piece of hardware (grey)."""
+    def proc(self, x, y, w, h, name, desc=(), planned=False, fill="#ffffff", stroke=GREY, name_size=14.5, tag_at=None,
+             tag="planned"):
+        """A process (white) or, through device(), a piece of hardware (grey). `planned` draws it dashed
+        with a small `tag` ("planned", "ordered", "unverified") on its top edge."""
         self.box(x, y, w, h, fill=fill, stroke=stroke, dash="6 4" if planned else None)
         if tw(name, name_size, True) > w - 4 or any(tw(d, 12.5) > w - 2 for d in desc):
             print(f"  warning: text may overflow box {name!r}")
@@ -95,10 +98,11 @@ class Fig:
         self.text(x + w / 2, top, name, size=name_size, weight=700, anchor="middle")
         self.lines(x + w / 2, top + 17, desc, fill=MUTED, anchor="middle")
         if planned:
-            self.tag(tag_at or x + w - 8, y)
+            self.tag(tag_at or x + w - 8, y, tag)
 
-    def device(self, x, y, w, h, name, desc=(), planned=False, tag_at=None):
-        self.proc(x, y, w, h, name, desc, planned, fill=NODE_FILL, stroke=NODE_EDGE, tag_at=tag_at)
+    def device(self, x, y, w, h, name, desc=(), planned=False, tag_at=None, name_size=14.5, tag="planned"):
+        self.proc(x, y, w, h, name, desc, planned, fill=NODE_FILL, stroke=NODE_EDGE, tag_at=tag_at, name_size=name_size,
+                  tag=tag)
 
     def card(self, x, y, w, h, title, sub=(), body=(), top=False):
         """Plain-language box for the overview figures: title, grey hardware lines, then what it does."""
@@ -457,11 +461,231 @@ def fig_network_overview():
     f.save()
 
 
+def fig_components():
+    """Figure 0: every physical component on the boat and what joins it, plus the vehicles and the
+    operator off the boat. Link colours separate Ethernet, USB / serial / CAN, MAVLink command, radio,
+    DC power, AC power and the hardware interlock. Dashed boxes are planned, ordered, or built in 2025
+    but not verified on this boat (docs/HARDWARE.md, docs/previous pdfs/). Sized for a 16:9 slide."""
+    f = Fig("fig0_system_components", 1400, 736)
+    f.header(8, 1158, "ON THE BOAT")
+    f.header(1180, 1392, "OFF THE BOAT")
+    f.box(8, 36, 1150, 630, fill="#fafbfc", stroke=GREY, sw=1.2, rx=8)
+
+    # Off the boat: everything it talks to, lined up with its counterpart on the boat
+    f.card(1180, 60, 212, 70, "Shore laptop", ["QGC, dashboard, ssh,", "MOOS shoreside (planned)"])
+    f.card(1180, 168, 212, 60, "UAV", ["S500 quad: Pixhawk, Pi"])
+    f.card(1180, 250, 212, 60, "RC handset", ["RadioMaster Boxer, ELRS"])
+    f.card(1180, 555, 212, 60, "ROV", ["BlueROV2 base: Pixhawk, Pi"])
+
+    # AC bus along the top, fed by the inverter up the left edge (purple)
+    f.edge([(18, 570), (18, 50), (1060, 50)], "ac", arrows="none")
+    f.text(1072, 54, "AC", size=11.5, weight=700, fill=AC)
+
+    # Row 1: compute and comms
+    f.device(44, 66, 220, 66, "Jetson Orin Nano", ["mavlink-router, dashboard, logs", "MOOS-IvP (planned)"])
+    f.device(760, 66, 190, 56, "Network switch", ["Ethernet, PoE"])
+    f.device(1000, 66, 120, 56, "Starlink", ["internet uplink"])
+    for x in (154, 855, 1060):
+        f.edge([(x, 50), (x, 66)], "ac", arrows="none")
+    f.edge([(264, 94), (760, 94)], "eth", arrows="both")
+    f.text(512, 86, "Ethernet", size=11, fill=ETH, anchor="middle")
+    f.edge([(950, 94), (1000, 94)], "eth", arrows="both")
+    f.edge([(1120, 94), (1180, 94)], "cmd", arrows="both", dash=True)
+    f.text(1150, 118, "Tailscale", size=11, fill=CMD, anchor="middle")
+
+    # Row 2: GPS under the Jetson; camera and radios under the switch, next to the vehicles they serve
+    f.device(44, 170, 110, 50, "GPS CG01-02", ["DroneCAN"])
+    f.device(760, 170, 100, 50, "IP camera", ["PoE"])
+    f.device(1000, 170, 150, 56, "Mesh radio", ["Microhard or Doodle"], planned=True, tag="planned")
+    f.device(1000, 250, 150, 56, "ELRS receiver", ["XR3, CRSF on TELEM3"], planned=True, tag="ordered")
+    f.edge([(810, 170), (810, 122)], "eth", arrows="none")
+    f.edge([(1010, 170), (1010, 140), (900, 140), (900, 122)], "eth", arrows="none", dash=True)
+    f.edge([(1150, 198), (1180, 198)], "cmd", arrows="both", dash=True)
+    f.text(1165, 220, "radio", size=11, fill=CMD, anchor="middle")
+    f.edge([(1180, 278), (1150, 278)], "cmd", dash=True)
+    f.text(1165, 300, "radio", size=11, fill=CMD, anchor="middle")
+    f.edge([(1000, 278), (264, 278)], "data", dash=True)
+    f.text(632, 270, "CRSF, serial", size=11, fill=MUTED, anchor="middle")
+
+    # Pixhawk under the Jetson
+    f.device(44, 250, 220, 70, "Pixhawk 6X", ["ArduRover 4.7", "heading + speed loops, failsafes"])
+    f.edge([(200, 132), (200, 250)], "cmd", arrows="both")
+    f.text(208, 196, "MAVLink, USB", size=11, fill=MUTED)
+    f.edge([(99, 220), (99, 250)], "data")
+    f.text(107, 240, "CAN", size=11, fill=MUTED)
+
+    # Row 3: VCB under the Pixhawk, propulsion and the 2025 auxiliary boards to its right
+    f.device(44, 370, 200, 150, "VCB", ["STM32H7, bench firmware", "PWM checks, contactors,", "E-stop and TSMS sense,", "20 % thrust cap"])
+    f.edge([(210, 320), (210, 370)], "cmd")
+    f.text(218, 350, "2 × PWM", size=11, fill=CMD)
+    f.device(270, 420, 130, 40, "E-stop + TSMS", ["hardware interlock"], name_size=13)
+    f.edge([(270, 440), (244, 440)], "safe")
+    f.group(420, 360, 150, 140, "Propulsion")
+    f.device(430, 386, 130, 40, "ePropulsion", ["protocol converter"], name_size=13)
+    f.device(426, 446, 66, 44, "Navy 6.0", ["left"], name_size=13)
+    f.device(498, 446, 66, 44, "Navy 6.0", ["right"], name_size=13)
+    f.edge([(244, 406), (430, 406)], "data")
+    f.text(337, 400, "serial", size=11, fill=MUTED, anchor="middle")
+    f.edge([(459, 426), (459, 446)], "data")
+    f.edge([(531, 426), (531, 446)], "data")
+    f.edge([(244, 474), (420, 474)], "pwr", arrows="none")
+    f.text(332, 488, "HV via contactors", size=11, fill=PWR, anchor="middle")
+
+    f.device(620, 380, 130, 60, "MCB LARS", ["LARS motors, 2.25 A", "UART7 from VCB"], planned=True, tag="unverified")
+    f.device(790, 380, 130, 60, "MCB REEL", ["reel motor, 6 A", "UART3, off in source"], planned=True, tag="unverified")
+    f.edge([(244, 500), (300, 500), (300, 525), (820, 525), (820, 440)], "data", dash=True)
+    f.edge([(650, 525), (650, 440)], "data", dash=True)
+    f.text(560, 519, "RS485 / UART", size=11, fill=MUTED, anchor="middle")
+
+    # Monitoring links back to the Jetson run up the left edge: VCB telemetry (USB) and the BMS (RS485)
+    f.edge([(200, 545), (200, 532), (30, 532), (30, 345), (64, 345), (64, 370)], "data", arrows="none")
+    f.edge([(30, 345), (30, 100), (44, 100)], "data")
+    f.text(70, 340, "VCB telemetry, USB", size=11, fill=MUTED)
+    f.text(115, 526, "BMS, RS485", size=11, fill=MUTED, anchor="middle")
+
+    # Row 4: power, and the tether power box (built 2025, never run with HV in the water)
+    f.device(44, 545, 130, 50, "Inverter", ["48 V DC to AC"])
+    f.device(190, 545, 160, 80, "48 V battery", ["LiTime 100 Ah", "with BMS"])
+    f.device(620, 545, 170, 80, "Tether power", ["400 V boost + IMD", "built 2025, HV never", "run in the water"], planned=True, tag="unverified")
+    f.edge([(190, 570), (174, 570)], "pwr", arrows="none")
+    f.edge([(44, 570), (18, 570)], "ac", arrows="none")
+    f.edge([(230, 545), (230, 520)], "pwr", arrows="none")
+    f.text(238, 538, "48 V", size=11, fill=PWR)
+    f.edge([(350, 585), (620, 585)], "pwr", arrows="none", dash=True)
+    f.text(485, 579, "48 V", size=11, fill=PWR, anchor="middle")
+    f.edge([(790, 585), (1180, 585)], "pwr", arrows="none", dash=True)
+    f.text(985, 579, "tether: 400 V + Ethernet", size=11, fill=MUTED, anchor="middle")
+
+    f.legend(16, 694, [("cmd", False, "MAVLink command"), ("cmd", True, "radio or internet"),
+                       ("eth", False, "Ethernet"), ("data", False, "USB / serial / CAN"),
+                       ("pwr", False, "48 V / HV DC"), ("ac", False, "AC from inverter"),
+                       ("safe", False, "hardware interlock"), ("box", False, "planned, ordered, unverified")],
+             col_w=290, per_row=4)
+    f.save()
+
+
+def fig_safety_cascade():
+    """Figure 4: the four ways to safe the boat, softest and slowest on the left, hardest and fastest on
+    the right. Each tier is meant to catch the one before it failing. Facts from docs/HARDWARE.md,
+    docs/VCB_BENCH_FIRMWARE.md, params/boat.parm and moos-ivp-remora/README.md. Sized for a 16:9 slide."""
+    f = Fig("fig4_safety_cascade", 1400, 556)
+    tiers = [
+        dict(n="1", name="Mission autonomy", where="MOOS-IvP on the Jetson", planned=True,
+             by=["shore operator (pMarineViewer), or the", "helm itself"],
+             ways=["• STATION_KEEP or RETURN: the helm swaps",
+                   "  behaviors; the boat holds or comes home.",
+                   "• MOOS_MANUAL_OVERRIDE: the helm parks and",
+                   "  the bridge asks ArduRover for HOLD.",
+                   "• ALLSTOP: the bridge asks ArduRover to disarm.",
+                   "• Op-region fence behavior: all-stop outside",
+                   "  the basin.",
+                   "• The bridge only commands while DEPLOY, armed,",
+                   "  GUIDED, and the setpoint is under 5 s old."],
+             result=["ArduRover in HOLD or disarmed.", "Takes seconds."],
+             gap=["Jetson or MOOS crash. A lost shore link does", "not stop the mission: the helm keeps running", "onboard."],
+             status=(["Tested in sim and SITL,", "not on the boat."], MUTED)),
+        dict(n="2", name="Autopilot", where="ArduRover 4.7 on the Pixhawk 6X", planned=False,
+             by=["QGC, the RC handset, the bridge, or", "ArduRover itself"],
+             ways=["• Disarm from QGC, RC or the bridge: both",
+                   "  outputs drop to 990 µs.",
+                   "• Mode switch: MANUAL sticks, HOLD stops,",
+                   "  GUIDED follows MOOS. RC switch (planned).",
+                   "• Pre-arm checks: GPS, EKF, compass, voltage.",
+                   "• GUIDED: no new velocity target for 3 s, stop.",
+                   "• Failsafes, each to HOLD: RC loss, GCS",
+                   "  heartbeat loss, geofence, EKF, crash check."],
+             result=["HOLD or disarmed: both PWM at 990 µs,", "which the VCB reads as stopped. Under 1 s."],
+             gap=["Pixhawk hang or a stuck PWM output. The 48 V", "pack is invisible to ArduPilot, so no battery", "failsafe yet."],
+             status=(["All failsafes are OFF today.", "On once the RC receiver is in."], SAFE)),
+        dict(n="3", name="Thruster gateway", where="VCB bench firmware, STM32H7", planned=False,
+             by=["the VCB itself, from what the PWM and the", "HV bus look like"],
+             ways=["• Arms only after both PWM are valid and at",
+                   "  most 1050 µs for 1 s; else contactors stay open.",
+                   "• PWM must be 1000 to 2000 µs. Missing for",
+                   "  100 ms, or 3 bad pulses while armed: FAULT.",
+                   "• Thrust clamped to 0 to 20 % forward, no reverse.",
+                   "• Precharge, contactor feedback and bus-voltage",
+                   "  checks (under 35 V in RUN): FAULT.",
+                   "• FAULT latches: contactors open; recover only",
+                   "  by power-cycling the VCB."],
+             result=["Contactors open, motors unpowered.", "Within 100 ms of the PWM going bad."],
+             gap=["A valid but wrong command, e.g. PWM stuck at", "1200 µs. The source of this build is not on hand,", "so it cannot be changed yet."],
+             status=(["Deployed. Bench-verified", "2026-10-04 with HV off."], MUTED)),
+        dict(n="4", name="Hardware E-stop", where="24 V TSMS loop to the contactor coils", planned=False,
+             by=["a person at the boat, or a remote relay"],
+             ways=["• E-stop button on the boat opens the 24 V loop:",
+                   "  coils drop, contactors open, the VCB faults.",
+                   "• TSMS key or plug: same loop, pulled before",
+                   "  anyone goes near the HV bus.",
+                   "• Remote relay E-stop (planned): a radio receiver",
+                   "  drives a relay in the same loop; link loss",
+                   "  opens it, so it is a dead-man.",
+                   "• Last resort: pull the battery disconnect."],
+             result=["HV off regardless of any software. Instant.", "The boat drifts."],
+             gap=["Nothing restarts it remotely; recovery needs a", "crew boat. The VCB firmware does not read the", "loop, it only loses coil power."],
+             status=(["Button and TSMS wired.", "Remote relay not chosen yet."], MUTED)),
+    ]
+    # softest-to-hardest arrow across the top
+    f.text(20, 22, "SOFTEST, SLOWEST", size=11.5, weight=700, fill=MUTED, spacing=1.2)
+    f.text(1380, 22, "HARDEST, FASTEST", size=11.5, weight=700, fill=MUTED, spacing=1.2, anchor="end")
+    f.edge([(176, 18), (520, 18)], "safe", arrows="none")
+    f.edge([(880, 18), (1222, 18)], "safe")
+    f.text(700, 22, "each tier is there to catch the one before it failing", size=12, fill=MUTED, anchor="middle", italic=True)
+
+    x, w, gap_x, y0, h = 20, 322, 24, 44, 478
+    for i, t in enumerate(tiers):
+        cx = x + i * (w + gap_x)
+        f.box(cx, y0, w, h, fill=NODE_FILL, stroke=NODE_EDGE, sw=1.4, rx=10, dash="6 4" if t["planned"] else None)
+        if t["planned"]:
+            f.tag(cx + w - 10, y0)
+        # header
+        f.add(f'<circle cx="{cx + 30}" cy="{y0 + 30}" r="14" fill="{SAFE}"/>')
+        f.text(cx + 30, y0 + 35, t["n"], size=14, weight=700, fill="#ffffff", anchor="middle")
+        f.text(cx + 54, y0 + 27, t["name"], size=15.5, weight=700)
+        f.text(cx + 54, y0 + 44, t["where"], size=12, fill=MUTED)
+        if i < len(tiers) - 1:
+            f.edge([(cx + w, y0 + 30), (cx + w + gap_x, y0 + 30)], "safe")
+        tx, ty = cx + 14, y0 + 74
+        # triggered by
+        f.text(tx, ty, "TRIGGERED BY", size=10.5, weight=700, fill=MUTED, spacing=1.1)
+        f.lines(tx, ty + 17, t["by"], size=12, lead=15)
+        ty += 17 + 15 * len(t["by"]) + 14
+        # ways to safe
+        f.text(tx, ty, "WAYS TO SAFE THE BOAT", size=10.5, weight=700, fill=MUTED, spacing=1.1)
+        f.lines(tx, ty + 17, t["ways"], size=12, lead=15.5)
+        for row in t["ways"] + t["by"] + t["result"] + t["gap"]:
+            if tw(row, 12) > w - 32:
+                print(f"  warning: line too wide in tier {t['n']}: {row!r}")
+        ty = y0 + 74 + 17 + 30 + 14 + 17 + 15.5 * 9 + 12  # same place in every tier
+        # result
+        f.box(cx + 10, ty, w - 20, 50, fill="#ffffff", stroke="#d6dae0", sw=1, rx=6)
+        f.add(f'<rect x="{cx + 10}" y="{ty}" width="4" height="50" fill="{CMD}"/>')
+        f.text(tx + 8, ty + 15, "RESULT", size=10.5, weight=700, fill=CMD, spacing=1.1)
+        f.lines(tx + 8, ty + 31, t["result"], size=12, lead=15)
+        ty += 60
+        # does not cover
+        f.box(cx + 10, ty, w - 20, 66, fill="#ffffff", stroke="#d6dae0", sw=1, rx=6)
+        f.add(f'<rect x="{cx + 10}" y="{ty}" width="4" height="66" fill="{SAFE}"/>')
+        f.text(tx + 8, ty + 15, "DOES NOT COVER", size=10.5, weight=700, fill=SAFE, spacing=1.1)
+        f.lines(tx + 8, ty + 31, t["gap"], size=12, lead=15)
+        ty += 76
+        # status
+        rows, colour = t["status"]
+        f.text(tx, ty + 12, "STATUS", size=10.5, weight=700, fill=MUTED, spacing=1.1)
+        f.lines(tx + 60, ty + 12, rows, size=12, lead=15, fill=colour, weight=700 if colour == SAFE else 400)
+
+    f.text(20, 546, "Dashed: planned, not on the boat yet. Red status: a gap that must close before the boat goes in the water.",
+           size=12, fill=MUTED)
+    f.save()
+
+
 if __name__ == "__main__":
     if not shutil.which("rsvg-convert"):
         raise SystemExit("rsvg-convert not found (macOS: brew install librsvg, Ubuntu: apt install librsvg2-bin)")
+    fig_components()
     fig_system_overview()
     fig_architecture()
     fig_network_overview()
     fig_network()
     fig_control_layers()
+    fig_safety_cascade()

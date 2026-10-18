@@ -116,6 +116,14 @@ read through an **STLINK-V3** probe (serial `003E001C3234511037333934`, VCP on `
 pinned as `/dev/vcb`. A UART bridge needs the right baud (unlike CDC); `vcb_logger.py`
 defaults to 115200, unverified. The same probe gives SWD access for reading/flashing the VCB.
 
+### C. `firmware/VCB-pixhawk/` (2026-10-16) — rebuilt from the GitHub source, PWM in, reversible **[src]**
+Not flashed, not bench-tested. The deployed build's source is not currently available, so
+this is cttdev's CRSF version with the RC input replaced by TIM2/TIM5 input capture on the
+same two pins (PA3 = ch1 right, PA2 = ch2 left), a bidirectional contract (1500 µs stop,
+2000 forward, 1000 reverse, clamped to ±20 % by default), the unchanged contactor sequence,
+fault recovery after a neutral hold, and the same CSV telemetry. Contract, Pixhawk parameters
+(`params/vcb-pixhawk.parm`), flashing (dump first) and the bench plan are in its README.
+
 ### Consequences for ArduPilot
 - **No reverse** on the current firmware ⇒ a skid-steer boat cannot turn in place or stop
   quickly; Rover's steering authority is only differential forward thrust. Tuning still
@@ -128,7 +136,7 @@ defaults to 115200, unverified. The same probe gives SWD access for reading/flas
   "stopped" for 1 s. The sequence and the operator procedure are in `VCB_BENCH_FIRMWARE.md`.
 - Both are **firmware policy, not hardware limits**. When the boat is closer to the
   water, re-evaluate whether to rebuild the VCB firmware from the GitHub version with
-  PWM input, reverse, and a higher cap; the source for the bench build is lost.
+  PWM input, reverse, and a higher cap; the source for the bench build is not currently available.
 
 ## MCB (Motor Control Board) **[src]**
 STM32U535, two DRV8245 brushed H-bridges, current via IPROPI ADC, 1 s power ramp,

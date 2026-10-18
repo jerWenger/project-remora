@@ -63,6 +63,14 @@ deploy/install.sh --dry-run                   # read what it will do
 sudo deploy/install.sh
 ```
 
+## MOOS-IvP
+
+MOOS-IvP, MAVSDK and this repo's `moos-ivp-remora` tree are installed by the Ansible playbook
+in [`ansible/`](../ansible/README.md), run from the laptop. They land in `~/moos-ivp`,
+`/usr/local` and `~/project-remora/moos-ivp-remora/bin`, with a PATH block in `~/.bashrc`. The
+vehicle community is started by hand for now (`launch_vehicle.sh`, see
+[`moos-ivp-remora/README.md`](../moos-ivp-remora/README.md)); there is no systemd unit for it yet.
+
 ## Updating
 
 Push from the laptop, then on the Jetson:

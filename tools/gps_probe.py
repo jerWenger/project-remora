@@ -160,12 +160,12 @@ def watch_gps(m, seconds):
     for k, msg in seen.items():
         ft = msg.fix_type
         yaw = getattr(msg, "yaw", 0)
-        yaw_s = "none (0 = GPS gives no yaw)" if yaw == 0 else f"{(yaw % 36000) / 100:.1f} deg"
+        yaw_s = "none (ArduPilot has no GPS yaw)" if yaw in (0, 65535) else f"{(yaw % 36000) / 100:.1f} deg"
         print(f"  {k:12s} fix={ft} ({FIX.get(ft, '?')}) sats={msg.satellites_visible} "
               f"lat={msg.lat / 1e7:.6f} lon={msg.lon / 1e7:.6f} yaw={yaw_s}")
         if ft == 0:
             print("    -> the driver has not detected a receiver on any GPS port.")
-        elif yaw == 0:
+        elif yaw in (0, 65535):
             print("    -> position but no GPS yaw: either the receiver has no heading solution yet (empty $GxHDT; "
                   "both antennas need a fix, give it clear sky and a minute) or the driver is not passing HDT. "
                   "--probe prints the actual HDT line.")

@@ -20,6 +20,7 @@ Ctrl-C stops SITL and the fake-battery writer.
 | `run_sitl.sh` | starts `ardurover` directly (no MAVProxy, no mavlink-routerd needed) |
 | `boat-sitl.parm` | param overlay: real-boat behaviour params on top of the SITL defaults |
 | `smoke_test.py` | end-to-end check; refuses to command anything that isn't SITL |
+| `sitl_arm_guided.py` | `-I N` puts SITL into GUIDED and force-arms it (what QGC would do by hand) so iArduRoverBridge starts commanding; `--disarm` for HOLD + disarm. SITL-only guard like the smoke test |
 | `run/` (gitignored) | `I<n>/eeprom.bin`, `I<n>/logs/` (dataflash), `state/` (fake dashboard JSON), `ap-build/` (native SITL build) |
 
 ## Options

@@ -37,8 +37,11 @@ Not done yet:
 - No RC receiver is installed, and the RC, ground-station and geofence failsafes are off.
   **Nothing stops the boat on a lost link today. Fix this before it goes in the water.**
 - Compass calibration and on-water tuning.
-- MOOS-IvP and `iArduRoverBridge` are not installed on the Jetson.
-- The VCB runs a bench firmware build: forward thrust only, capped at 20 %, and its source is lost.
+- MOOS-IvP and `iArduRoverBridge` are not installed on the Jetson yet. The install is now an
+  Ansible playbook ([`ansible/`](ansible/README.md)) and the autonomy tree is in
+  [`moos-ivp-remora/`](moos-ivp-remora/README.md); both are tested on the laptop, not yet run
+  against the boat.
+- The VCB runs a bench firmware build: forward thrust only, capped at 20 %, and its source is not currently available (the flash dump is in `firmware/`).
 
 ## Start here
 
@@ -50,6 +53,8 @@ Not done yet:
 | [`docs/JETSON.md`](docs/JETSON.md) | Jetson runbook: deploy, update, verify, troubleshoot, services and ports |
 | [`tools/README.md`](tools/README.md) | Parameter, log and inventory tools, and the tuning-session workflow |
 | [`sim/README.md`](sim/README.md) | Running the boat in simulation on a laptop |
+| [`moos-ivp-remora/README.md`](moos-ivp-remora/README.md) | MOOS-IvP tree: `iArduRoverBridge`, the `remora` mission, sim / SITL / boat launch |
+| [`ansible/README.md`](ansible/README.md) | Installing MOOS-IvP, MAVSDK and `moos-ivp-remora` on the Jetson |
 | [`params/boat.parm`](params/boat.parm) | The ArduPilot parameters we have decided on, each with its reason |
 
 ## Using it
@@ -64,6 +69,8 @@ Everything on the boat is reachable only from the team's Tailscale network.
 | Run the simulator | `sim/run_sitl.sh` |
 | Dump the autopilot's parameters | `tools/ap_inventory.py --params params/$(date +%F).parm` |
 | Update the Jetson after a push | `~/project-remora/deploy/update.sh` on the Jetson |
+| Install MOOS-IvP on the Jetson | `cd ansible && ansible-playbook site.yml -K` |
+| Run the MOOS mission in simulation | `moos-ivp-remora/missions/remora/launch.sh --sim` |
 
 ## Repository layout
 
@@ -77,7 +84,9 @@ deploy/     install.sh and update.sh for the Jetson, plus logrotate and journald
 tools/      ArduPilot inventory, parameter, log and bench-check scripts
 params/     boat.parm (desired state) and dated parameter dumps
 sim/        ArduPilot SITL launcher, parameter overlay and smoke test
-firmware/   Flash dump of the VCB bench firmware
+moos-ivp-remora/  MOOS-IvP tree (moos-ivp-extend layout): src/iArduRoverBridge, missions/remora
+ansible/    Playbook that installs moos-ivp, MAVSDK and moos-ivp-remora on the Jetson
+firmware/   Flash dump of the VCB bench firmware; VCB-pixhawk/ = rebuilt VCB firmware (PWM in, reverse), untested
 docs/       Hardware notes, Jetson runbook, VCB firmware analysis, figures, raw inventories
 ```
 
@@ -86,5 +95,7 @@ camera password. Use `config/cam.yml.example`.
 
 ## Related repositories
 
-- VCB and MCB firmware: https://github.com/cttdev (`VCB`, `MCB`)
-- MOOS-IvP missions and `iArduRoverBridge`: the `mCDR-Plume-Tracking` repo
+- VCB and MCB firmware: https://github.com/cttdev (`VCB`, `MCB`); `firmware/VCB-pixhawk/` is derived
+  from `VCB` commit `aa3dbf8` (see its `UPSTREAM.md`)
+- `iArduRoverBridge` came from the `mCDR-Plume-Tracking` repo (copied into
+  `moos-ivp-remora/src/`, commit `7e47576`); MOOS-IvP itself: https://github.com/moos-ivp/moos-ivp
