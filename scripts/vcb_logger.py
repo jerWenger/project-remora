@@ -27,7 +27,8 @@ DEFAULT_FIELDS = {
     "status": ["ms", "thruster_state", "armed", "estop_24v_present",
                "tsms_24v_present", "lsc_closed", "hsc_closed", "bus_mv"],
 }
-SKIP_IDS = ("ArduPilot", "Pixhawk", "FTDI")
+# "PX4_BL"/"FMU": the Pixhawk 6X in its bootloader enumerates as usb-Auterion_PX4_BL_FMU_v6X.x_0
+SKIP_IDS = ("ArduPilot", "Pixhawk", "PX4_BL", "FMU", "FTDI")
 
 
 def num(s):
