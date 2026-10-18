@@ -159,10 +159,16 @@ def watch_gps(m, seconds):
         print("  no GPS_RAW_INT at all (stream not requested? QGC usually requests it; try again)")
     for k, msg in seen.items():
         ft = msg.fix_type
+        yaw = getattr(msg, "yaw", 0)
+        yaw_s = "none (0 = GPS gives no yaw)" if yaw == 0 else f"{(yaw % 36000) / 100:.1f} deg"
         print(f"  {k:12s} fix={ft} ({FIX.get(ft, '?')}) sats={msg.satellites_visible} "
-              f"lat={msg.lat / 1e7:.6f} lon={msg.lon / 1e7:.6f}")
+              f"lat={msg.lat / 1e7:.6f} lon={msg.lon / 1e7:.6f} yaw={yaw_s}")
         if ft == 0:
             print("    -> the driver has not detected a receiver on any GPS port.")
+        elif yaw == 0:
+            print("    -> position but no GPS yaw: either the receiver has no heading solution yet (empty $GxHDT; "
+                  "both antennas need a fix, give it clear sky and a minute) or the driver is not passing HDT. "
+                  "--probe prints the actual HDT line.")
     return seen
 
 
@@ -172,7 +178,16 @@ def classify(buf):
     nmea = NMEA_RE.findall(buf)
     if nmea:
         names = sorted({b"$" + a for a in set(re.findall(rb"\$([A-Z]{5,8}),", buf))})
-        return "NMEA", "sentences: " + " ".join(n.decode() for n in names[:12])
+        detail = "sentences: " + " ".join(n.decode() for n in names[:12])
+        # heading sentences: show one so an empty "$GNHDT,,T" (no heading solution) is visible
+        hdt = re.findall(rb"\$G[A-Z]{1,2}(?:HDT|THS),[^\r\n]*", buf)
+        if hdt:
+            last = hdt[-1].decode("ascii", "replace")
+            empty = re.match(r"\$G\w+,\s*,", last) is not None
+            detail += f"\n           heading: {last}" + ("   <-- EMPTY: receiver has no heading solution" if empty else "")
+        else:
+            detail += "\n           no $GxHDT/$GxTHS: enable it on the UM982 (GPHDT COMn 0.2) or use GPS1_TYPE,25 + GPS_AUTO_CONFIG,1"
+        return "NMEA", detail
     if UNICORE_ASCII_RE.search(buf):
         names = sorted(set(re.findall(rb"#([A-Z]{4,12}),", buf)))
         return "UNICORE-ASCII", "messages: " + " ".join(n.decode() for n in names[:12])
