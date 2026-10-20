@@ -11,7 +11,8 @@ versioned param file. Everything here is read-only against the vehicle except
 | `ap_apply.py` | laptop or Jetson | Apply a desired-state `.parm` (e.g. `params/boat.parm`): reads only the named params, prints current → desired, asks y/N, backs up the old values to `params/backup_<UTC>.parm`, writes + verifies each, lists the ones that need a reboot. Refuses if armed |
 | `ap_logs.py` | laptop or Jetson | `list` / `get <id>… \| --latest N \| --all` / `erase --yes-really` dataflash logs over MAVLink into `logs/ap/<UTC>_<id>.BIN`; re-requests dropped chunks, skips logs already downloaded |
 | `gps_probe.py` | Jetson | Why isn't the serial GPS detected? Prints the GPS slots, which `SERIALn` carry the GPS protocol and at what baud, and what that combination means in words; watches `GPS_RAW_INT`; with `--probe` taps the raw bytes on each GPS port through `SERIAL_PASS*` → `ttyACM1`, tries each baud, says NMEA / Unicore binary / noise / nothing, then restores the params. Disarmed only |
-| `vcb_bench_check.py` | Jetson | Dead-bus check of Pixhawk → VCB wiring and the µs → ‰ curve via ArduPilot motor test; refuses unless the VCB reports bus < 5 V and contactors open |
+| `vcb_bench_check.py` | Jetson | Pixhawk → VCB wiring and the µs → ‰ curve via ArduPilot motor test. Default: dead bus only (refuses unless the VCB reports bus < 5 V and contactors open). `--live --side right\|left`: motors turn, requires the VCB in RUN, typed confirmation (commissioning stage 4) |
+| `vcb_bench_drive.py` | Jetson | Spins the motors through the VCB console (`bench` mode, firmware ≥ 0.3.0), no Pixhawk involved: on, arm, ramp, hold, ramp down, off; capped at 10 %; aborts to zero on Ctrl-C, fault or stale data (commissioning stage 3) |
 | `jetson_inventory.sh` | Jetson | L4T/kernel, Tailscale relay state, USB/serial device IDs for a udev rule, who holds the serial port, service states, BMS file freshness, temps, installed Python/MOOS software |
 
 ## Setup (laptop)

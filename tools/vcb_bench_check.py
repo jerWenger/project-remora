@@ -7,7 +7,21 @@
 Uses ArduPilot motor test (MAV_CMD_DO_MOTOR_TEST, PWM mode) to drive ThrottleLeft and
 ThrottleRight one at a time, and reads what the VCB says it measured and would apply
 (vcb.json from vcb_logger.py). Answers: which VCB channel each Pixhawk output reaches,
-the us -> permille curve, and whether the 1200 us clamp is real.
+the us -> permille curve, and where the clamp is.
+
+Deployed forward-only build: (us - 1000) o/oo clamped at 1200 us = 200 o/oo; the default
+steps above cover it. firmware/VCB-pixhawk (reversible, 1500 us = stop): use the step list
+in its README, e.g. --pwm 1500,1550,1600,1620,1700,1450,1400,1380,1300,1000,2000 and the
+end-point cases 990,1010,1990,2010; it also reports ch1_cmd/ch2_cmd, the signed value byte
+the VCB last sent to the ePropulsion converter (0 unless the VCB is in RUN).
+
+--live (stage 4 of docs/VCB_COMMISSIONING.md, PROPS OFF): the opposite precondition. The VCB
+must be in RUN with no fault, and the motors will turn. Asks for a typed confirmation; aborts
+to 1500 us if the VCB leaves RUN or faults. --side right|left|both picks the motor:
+
+    python3 tools/vcb_bench_check.py --live --side right --pwm 1550 --hold 2
+    python3 tools/vcb_bench_check.py --live --side right --pwm 2000 --hold 30   # end-point hold
+    python3 tools/vcb_bench_check.py --live --side right --pwm 1620,1380 --hold 3   # direct reversal
 
 SAFETY: refuses to start, and aborts mid-test, unless the VCB reports the HV bus dead
 (< --max-bus-v) and both contactors open. With the bus dead nothing can turn. Motor test
@@ -50,6 +64,20 @@ def bus_safe(v, max_bus_v):
     if st.get("lsc_closed") or st.get("hsc_closed"):
         return False, "contactor closed (LSC=%s HSC=%s)" % (st.get("lsc_closed"), st.get("hsc_closed"))
     return True, "bus %.1f V, contactors open" % (st["bus_mv"] / 1000.0)
+
+
+def live_safe(v):
+    """(ok, reason) for --live: fresh VCB data, VCB in RUN, no fault."""
+    if not v or not v.get("online"):
+        return False, "VCB offline (%s)" % (v or {}).get("msg", "no vcb.json")
+    if time.time() - (v.get("ts") or 0) > 3:
+        return False, "VCB data stale"
+    st = v.get("status") or {}
+    if st.get("fault_code"):
+        return False, "VCB fault %s" % st.get("fault_code")
+    if st.get("thruster_state") != 5:
+        return False, "VCB not in RUN (thruster_state %s)" % st.get("thruster_state")
+    return True, "VCB in RUN, bus %.1f V, no fault" % ((st.get("bus_mv") or 0) / 1000.0)
 
 
 def servo_out(m, ch, timeout=1.0):
@@ -95,13 +123,20 @@ def main():
     ap.add_argument("--max-bus-v", type=float, default=5.0)
     ap.add_argument("--left-ch", type=int, default=10, help="Pixhawk output of ThrottleLeft (SITL: 1); display only")
     ap.add_argument("--right-ch", type=int, default=9, help="Pixhawk output of ThrottleRight (SITL: 3); display only")
+    ap.add_argument("--side", choices=("left", "right", "both"), default="both", help="which motor(s) to command")
+    ap.add_argument("--live", action="store_true", help="bus LIVE, motors will turn: require VCB in RUN instead of a dead bus")
+    ap.add_argument("--yes", action="store_true", help="with --live: skip the typed props-off confirmation")
     a = ap.parse_args()
     steps = [int(x) for x in a.pwm.split(",")]
 
-    ok, why = bus_safe(read_vcb(a.vcb), a.max_bus_v)
-    print("safety: %s" % why)
+    check = live_safe if a.live else (lambda v: bus_safe(v, a.max_bus_v))
+    ok, why = check(read_vcb(a.vcb))
+    print("safety (%s): %s" % ("LIVE, motors will turn" if a.live else "dead bus", why))
     if not ok:
         sys.exit("refusing to run: %s" % why)
+    if a.live and not a.yes:
+        if input("Props OFF and everyone clear of the motors? type yes: ").strip().lower() != "yes":
+            sys.exit("aborted")
 
     m = mavutil.mavlink_connection(a.conn, source_system=254, source_component=190)
     # Through mavlink-router we also see QGC's heartbeats (QGC flags itself "armed"):
@@ -123,11 +158,15 @@ def main():
         sys.exit("vehicle is ARMED (per that heartbeat): refusing")
 
     rows = []
-    for name, seq, ch in (("LEFT", MOTOR_TEST_THROTTLE_LEFT, a.left_ch),
-                          ("RIGHT", MOTOR_TEST_THROTTLE_RIGHT, a.right_ch)):
+    sides = [s for s in (("LEFT", MOTOR_TEST_THROTTLE_LEFT, a.left_ch),
+                         ("RIGHT", MOTOR_TEST_THROTTLE_RIGHT, a.right_ch))
+             if a.side == "both" or s[0].lower() == a.side]
+    for name, seq, ch in sides:
         for pwm in steps:
-            ok, why = bus_safe(read_vcb(a.vcb), a.max_bus_v)
+            ok, why = check(read_vcb(a.vcb))
             if not ok:
+                if a.live:
+                    motor_test(m, seq, 1500, 1)       # back to neutral now, not at the timeout
                 sys.exit("ABORT: %s" % why)       # motor test times out on its own
             res = motor_test(m, seq, pwm, a.hold + 3)   # outlives the step so steps chain in one test
             if res != mavutil.mavlink.MAV_RESULT_ACCEPTED:
@@ -138,14 +177,17 @@ def main():
             p = v.get("pwm") or {}
             rows.append((name, pwm, out,
                          p.get("ch1_us"), p.get("ch1_applied_permille"), p.get("ch1_valid"),
-                         p.get("ch2_us"), p.get("ch2_applied_permille"), p.get("ch2_valid")))
+                         p.get("ch2_us"), p.get("ch2_applied_permille"), p.get("ch2_valid"),
+                         p.get("ch1_raw_permille"), p.get("ch2_raw_permille"),
+                         p.get("ch1_cmd"), p.get("ch2_cmd")))   # raw/cmd: VCB-pixhawk build only
             time.sleep(max(0.0, a.hold * 0.4))
         time.sleep(a.hold + 4)                    # let the test time out and disarm
 
-    print("\n%-6s %6s %7s | %7s %8s %5s | %7s %8s %5s" % (
-        "test", "cmd", "PX out", "ch1 us", "ch1 o/oo", "valid", "ch2 us", "ch2 o/oo", "valid"))
+    print("\n%-6s %6s %7s | %7s %8s %5s | %7s %8s %5s | %7s %7s %7s %7s" % (
+        "test", "us", "PX out", "ch1 us", "ch1 o/oo", "valid", "ch2 us", "ch2 o/oo", "valid",
+        "ch1 raw", "ch2 raw", "ch1 cmd", "ch2 cmd"))
     for r in rows:
-        print("%-6s %6d %7s | %7s %8s %5s | %7s %8s %5s" % tuple("-" if x is None else x for x in r))
+        print("%-6s %6d %7s | %7s %8s %5s | %7s %8s %5s | %7s %7s %7s %7s" % tuple("-" if x is None else x for x in r))
 
     # Which VCB channel followed each side: the one whose measured us tracks the command.
     def follower(side):
