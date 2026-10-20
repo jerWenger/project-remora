@@ -101,7 +101,18 @@ Reading of the PWM contract from those strings (needs bench confirmation):
 - Two **independent, forward-only** channels: ch1 = right motor, ch2 = left motor.
 - Nominal input range 1000–2000 µs. Pulses above **1200 µs are clamped**, i.e. the
   usable band is ~1000–1200 µs = 0–20 % thrust; everything above 1200 µs = 20 %.
-  This differs from the secondhand "1100–1900 → 0–20 %" **[told]** description.
+  This differs from the secondhand "1100–1900 → 0–20 %" **[told]** description, which its
+  author repeated on 2026-10-17 (below); the 2026-10-04 measurement confirmed the (µs − 1000) ‰
+  / 1200 µs reading, so 1100/1900 were most likely the Pixhawk's SERVO MIN/MAX at the time.
+
+**What the build's author told us (2026-10-17) [told]:** cttdev's VCB took an RC receiver on
+the **CONT** connector (CRSF on USART2 = PA2/PA3) and translated it into ePropulsion frames;
+no reverse, as far as they recall. They reprogrammed it to read Pixhawk PWM on the same CONT
+pins with a timer, and to map PWM to ePropulsion throttle. Their one troubleshooting lesson:
+near the ends of the range the Pixhawk's 1900 µs read as 1901–1905 µs, fell outside the mapped
+range, became a value the converter does not accept, and **the converter disarmed the motors at
+full throttle**. End points must be pinned explicitly in code. The source of that build is lost
+(their words; not on the Jetson either).
 - Arming: both channels at "stopped" for 1 s. PWM dropout or invalid period → FAULT.
 - The ePropulsion frame **[src]**: `28 addr 03 2C dir value xor 29`, addr 1 = left, 2 = right,
   dir 1 fwd / 0 rev, value 0–127. So the hardware *can* reverse; the bench build just doesn't.
@@ -116,13 +127,21 @@ read through an **STLINK-V3** probe (serial `003E001C3234511037333934`, VCP on `
 pinned as `/dev/vcb`. A UART bridge needs the right baud (unlike CDC); `vcb_logger.py`
 defaults to 115200, unverified. The same probe gives SWD access for reading/flashing the VCB.
 
-### C. `firmware/VCB-pixhawk/` (2026-10-16) — rebuilt from the GitHub source, PWM in, reversible **[src]**
-Not flashed, not bench-tested. The deployed build's source is not currently available, so
-this is cttdev's CRSF version with the RC input replaced by TIM2/TIM5 input capture on the
-same two pins (PA3 = ch1 right, PA2 = ch2 left), a bidirectional contract (1500 µs stop,
-2000 forward, 1000 reverse, clamped to ±20 % by default), the unchanged contactor sequence,
-fault recovery after a neutral hold, and the same CSV telemetry. Contract, Pixhawk parameters
-(`params/vcb-pixhawk.parm`), flashing (dump first) and the bench plan are in its README.
+### C. `firmware/VCB-pixhawk/` (0.3.0, 2026-10-20) — rebuilt from the GitHub source, PWM in, reversible **[src]**
+Not flashed, not bench-tested. The deployed build's source is lost, so this is cttdev's CRSF
+version with the RC input replaced by TIM2/TIM5 input capture on the same two pins (PA3 = ch1
+right, PA2 = ch2 left), a bidirectional contract (1500 µs stop, 2000 forward, 1000 reverse,
+clamped to ±20 % by default), the unchanged contactor sequence, fault recovery after a neutral
+hold, and the same CSV telemetry. 0.2.0 is built around the end-point incident above: widths
+700–2300 µs are accepted and anything at or past 1000/2000 µs is pinned to full scale, the
+converter value byte is produced with integer math and clamped to 0..0x7F, the byte actually
+sent is in the telemetry (`ch1_cmd`/`ch2_cmd`), and a direction change passes through 200 ms
+of zero. 0.3.0 adds console commands on `/dev/vcb` (`bench on`, `bench R L`, `bench off`,
+`stop`, `clear`) so the Jetson can spin the motors at a few percent without the Pixhawk
+(`tools/vcb_bench_drive.py`), capped at 10 % in firmware. Contract, Pixhawk parameters (`params/vcb-pixhawk.parm`), flashing (dump first) and
+the bench plan are in its README; the staged plan from there to a driving boat is
+`VCB_COMMISSIONING.md` (printable: `VCB_COMMISSIONING_CHECKLIST.pdf`; commands:
+`VCB_COMMISSIONING_CHEATSHEET.md`).
 
 ### Consequences for ArduPilot
 - **No reverse** on the current firmware ⇒ a skid-steer boat cannot turn in place or stop
