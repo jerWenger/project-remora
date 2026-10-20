@@ -1,0 +1,20 @@
+# Pixhawk outputs for firmware/VCB-pixhawk (reversible VCB build, 1500 us = stop).
+# DO NOT apply while the deployed forward-only VCB build is flashed: it reads 1500 us
+# as 50 % thrust (clamped to 20 %) on both motors as soon as it arms.
+# Apply with tools/ap_apply.py params/vcb-pixhawk.parm after flashing and after the
+# bench check in firmware/VCB-pixhawk/README.md. Overrides the SERVO9/10 lines in boat.parm.
+#
+# Functions unchanged: AUX1 -> VCB ch1 (right), AUX2 -> VCB ch2 (left), measured 2026-10-04.
+SERVO9_FUNCTION,74
+SERVO10_FUNCTION,73
+# VCB: 25 us deadband around 1500, then (|us-1500| - 25) * 1000/475 permille, applied =
+# clamp(raw, -200, +200) at the default THRUST_LIMIT_PERMILLE. MIN/MAX 1380/1620 put
+# Rover's full throttle range on the usable band (full forward = +20 %, full reverse =
+# -20 %). TRIM 1500 = stop, also the disarmed output, which is what arms the VCB.
+# Widen MIN/MAX when the VCB limit is raised.
+SERVO9_MIN,1380
+SERVO9_TRIM,1500
+SERVO9_MAX,1620
+SERVO10_MIN,1380
+SERVO10_TRIM,1500
+SERVO10_MAX,1620
