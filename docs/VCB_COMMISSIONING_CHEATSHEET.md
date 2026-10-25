@@ -54,11 +54,11 @@ cmp -l ~/VCB_flash_<new>.bin firmware/VCB_flash_20260805_211528_pre_tolerant_pwm
 cp ~/VCB_flash_<new>.bin firmware/ && git add firmware/VCB_flash_<new>.bin                   # keep it; commit with the results
 
 # 0.2  flash the committed binary (J); it is in the checkout, no copying needed
-sha256sum firmware/VCB-pixhawk-0.3.1.bin           # 5cde2afaa82b94a7a8ddbb0515eed363c2a4f1c200fdaea2b164953e0a0f82b5
-sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.1.bin 0x08000000 verify reset exit"
-#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.1.bin 0x08000000 -v -rst
+sha256sum firmware/VCB-pixhawk-0.3.2.bin           # 9bb6c56c40c25aeb7549df6619035518c5c62ffedaf4c457380190989496883d
+sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.2.bin 0x08000000 verify reset exit"
+#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.2.bin 0x08000000 -v -rst
 #   (sudo until the STLINK udev rule below is in; the VCP /dev/vcb already has one)
-#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.1; ...
+#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.2; ...
 #   once only, so openocd works as boat from then on:
 #   echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="3754", MODE="0666"' | sudo tee /etc/udev/rules.d/60-stlink.rules
 #   sudo udevadm control --reload && sudo udevadm trigger

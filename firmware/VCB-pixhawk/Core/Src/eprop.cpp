@@ -26,7 +26,7 @@ void EProp::sendOne(uint8_t address, Side side, int32_t permille) {
 
   uint8_t frame[8];
   frame[0] = 0x28;                                      // Head code
-  frame[1] = address;                                   // 0x01 left, 0x02 right
+  frame[1] = address;                                   // EPROP_ADDR_RIGHT / EPROP_ADDR_LEFT
   frame[2] = 0x03;                                      // Data length
   frame[3] = 0x2C;                                      // Throttle command
   frame[4] = reverse ? 0x00 : 0x01;                     // Direction
@@ -38,12 +38,15 @@ void EProp::sendOne(uint8_t address, Side side, int32_t permille) {
   last_cmd_[side] = static_cast<int16_t>(reverse ? -value : value);
 }
 
+/* Addresses as measured on the boat 2026-10-25: address 1 turns the right
+ * (starboard) motor, address 2 the left (port) one. cttdev's comment had them
+ * the other way round; the frame bytes are otherwise unchanged. */
 void EProp::sendThrottleCommand(int32_t right_permille, int32_t left_permille) {
-  sendOne(0x02, RIGHT, right_permille);
-  sendOne(0x01, LEFT, left_permille);
+  sendOne(EPROP_ADDR_RIGHT, RIGHT, right_permille);
+  sendOne(EPROP_ADDR_LEFT, LEFT, left_permille);
 }
 
 void EProp::sendStop(void) {
-  sendOne(0x02, RIGHT, 0);
-  sendOne(0x01, LEFT, 0);
+  sendOne(EPROP_ADDR_RIGHT, RIGHT, 0);
+  sendOne(EPROP_ADDR_LEFT, LEFT, 0);
 }

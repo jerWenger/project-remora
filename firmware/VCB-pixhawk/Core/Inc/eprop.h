@@ -7,7 +7,8 @@
 /*
  * ePropulsion protocol-converter driver (UART5, RS-485, 38400 8N1).
  * Frame (from cttdev/VCB): 28 addr 03 2C dir value xor 29
- *   addr  1 = left thruster, 2 = right thruster
+ *   addr  EPROP_ADDR_RIGHT / EPROP_ADDR_LEFT (config.h): on this boat 1 = right, 2 = left,
+ *         measured 2026-10-25; cttdev's comment said the opposite
  *   dir   1 = forward, 0 = reverse
  *   value 0..EPROP_FULL_SCALE_VALUE (0x7F in cttdev's code = 100 %)
  *   xor   = bytes 2..5 XORed
@@ -23,7 +24,7 @@
  */
 class EProp {
   public:
-    /* Index for lastCommand(). RIGHT = address 2 = VCB ch1, LEFT = address 1 = VCB ch2. */
+    /* Index for lastCommand(). RIGHT = VCB ch1 (PA3), LEFT = VCB ch2 (PA2). */
     enum Side { RIGHT = 0, LEFT = 1 };
 
     void init(UART_HandleTypeDef* huart);

@@ -112,6 +112,7 @@ def main():
     ap.add_argument("--ramp", type=float, default=1.0, help="ramp up / down time, s")
     ap.add_argument("--max", type=int, default=100, help="refuse |permille| above this (firmware caps at BENCH_LIMIT_PERMILLE too)")
     ap.add_argument("--flip", action="store_true", help="after the hold, command the opposite sign directly for another --seconds (reversal test)")
+    ap.add_argument("--warmup", type=float, default=0.0, help="seconds at zero in RUN before the ramp (the motor controllers get HV power only when the contactors close and need a few seconds to boot)")
     ap.add_argument("--yes", action="store_true", help="skip the props-off confirmation")
     ap.add_argument("--stop", action="store_true", help="send 'stop' and exit")
     ap.add_argument("--clear", action="store_true", help="send 'clear' and exit")
@@ -168,6 +169,17 @@ def main():
         if st is None:
             abort(err)
             sys.exit("not in RUN: %s" % err)
+
+        if a.warmup > 0:
+            print("warmup: %.1fs at zero in RUN (motor controllers booting)" % a.warmup)
+            w_end = time.time() + a.warmup
+            while time.time() < w_end:
+                vcb.send("bench 0 0")
+                st, pw, ev = vcb.state()
+                if st is None or st.get("fault_code") or st.get("thruster_state") != RUN:
+                    abort("VCB left RUN during warmup: %s" % (ev if st is None else "state=%s fault=%s" % (st.get("thruster_state"), st.get("fault_code"))))
+                    sys.exit("ABORTED: %s" % aborted["why"])
+                time.sleep(0.1)
 
         def drive(r, l):
             vcb.send("bench %d %d" % (r, l))

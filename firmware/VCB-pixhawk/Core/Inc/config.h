@@ -8,7 +8,7 @@
 #define VCB_CONFIG_H
 
 #define FW_NAME     "VCB pixhawk-pwm reversible"
-#define FW_VERSION  "0.3.1"
+#define FW_VERSION  "0.3.2"
 
 /* ---- Thrust limit -------------------------------------------------------
  * Hard cap applied to the command sent to the ePropulsion converter, in both
@@ -33,6 +33,11 @@
  * wide). Whether the converter's own full scale is 127 or 100 is unverified;
  * at the default 20 % limit the byte is 25 either way (20 % or 25 % thrust). */
 #define EPROP_FULL_SCALE_VALUE       127
+/* Converter addresses per physical motor. Measured on the boat 2026-10-25 with one
+ * motor commanded at a time: address 1 turned the right (starboard) motor, address 2
+ * the left (port) one. cttdev's source comment had them the other way round. */
+#define EPROP_ADDR_RIGHT             0x01
+#define EPROP_ADDR_LEFT              0x02
 
 /* ---- PWM input contract (per channel, bidirectional servo convention) ----
  *   1000 us = full reverse, 1500 us = stop, 2000 us = full forward

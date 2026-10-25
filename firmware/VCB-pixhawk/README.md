@@ -3,15 +3,17 @@
 Best-effort re-creation of the VCB (Vehicle Control Board, STM32H723VG) firmware
 that runs on the boat, built from the only source we have, plus reverse thrust.
 
-**Version 0.3.1 (2026-10-25). Status: 0.3.0 was flashed on the boat on 2026-10-25 and
+**Version 0.3.2 (2026-10-25). Status: 0.3.0 was flashed on the boat on 2026-10-25 and
 proved the console both ways (banner, headers, `help`), but its PWM capture never
 qualified: sub-microsecond glitches on both CONT lines, about every 5 ms, were captured as
 rise-and-fall at the same tick and counted as bad pulses. 0.3.1 fixes that (8 us hardware
 input filter, rising edge on CH3 and falling on CH4 as in the deployed build, glitch pairs
 discarded without touching the period, `chN_glitch` counters in the telemetry). 0.3.1 was
 flashed the same day: both channels qualify (993 us / 20067 us, `bad` 0, glitch counters 0,
-so the filter alone removes the glitches). Arming, contactors and motors not yet tested;
-commissioning continues in `docs/VCB_COMMISSIONING.md`.** Read "Before flashing" and
+so the filter alone removes the glitches). Same day, through bench mode: first live precharge
+and RUN (bus 53.8 V), TSMS proven as the contactor kill, both motors turned at 5 % one at a
+time, which showed the ePropulsion addresses are the reverse of cttdev's comment: 0.3.2 swaps
+them. Commissioning continues in `docs/VCB_COMMISSIONING.md`.** Read "Before flashing" and
 "Bench test plan" below.
 
 ## Where it comes from
@@ -42,7 +44,7 @@ is organised around it: see "End points are pinned" under "PWM contract".
 |---|---|---|
 | PWM ch1 (right motor) | PA3, CONT connector pin 2 | TIM5 input capture. Was USART2_RX (CRSF from the RC receiver on CONT). |
 | PWM ch2 (left motor) | PA2, CONT connector pin 1 | TIM2 input capture. Was USART2_TX. |
-| ePropulsion protocol converter | UART5 (RS-485, 38400 8N1) | frame `28 addr 03 2C dir value xor 29` |
+| ePropulsion protocol converter | UART5 (RS-485, 38400 8N1) | frame `28 addr 03 2C dir value xor 29`; addr 1 = right motor, 2 = left (measured) |
 | Console / telemetry | UART4 (PA0/PA1), 115200 8N1 | the STLINK-V3 VCP, `/dev/vcb` on the Jetson; also the command input, see "Console commands" |
 | MCB "LARS", "REEL" | UART7, USART3 | only `idle\n` is sent, 10 Hz |
 | LSC / HSC control | PD5 / PD6 | contactor coils |
@@ -103,10 +105,12 @@ the telemetry (`ch1_cmd`, `ch2_cmd`), so the bench can watch it at 990, 1010, 19
   To use ArduPilot's full throttle range inside the limit, narrow `SERVOn_MIN/MAX`
   (see "Pixhawk parameters"). Raising the limit is one number in `Core/Inc/config.h`.
 
-Both channels are independent (no mixing). Which physical motor each channel
-drives is inherited from the deployed build's labels (ch1 = right, address 2;
-ch2 = left, address 1) and the ePropulsion address comment in cttdev's code.
-**Confirm on the first live spin.**
+Both channels are independent (no mixing). Which physical motor each channel drives
+was settled on the boat on 2026-10-25, one motor commanded at a time through bench mode:
+ePropulsion **address 1 is the right (starboard) motor and address 2 the left**, the
+opposite of cttdev's source comment. Since 0.3.2 ch1 (PA3, Pixhawk ThrottleRight) sends to
+address 1 and ch2 (PA2, ThrottleLeft) to address 2 (`EPROP_ADDR_RIGHT/LEFT` in config.h).
+0.3.0/0.3.1 had them swapped.
 
 ## Direction changes
 
@@ -196,8 +200,8 @@ Same line kinds as the deployed build, so `scripts/vcb_logger.py`,
 `tools/vcb_bench_check.py` and the GCS page need no change:
 
 ```
-VCB pixhawk-pwm reversible 0.3.1; limit 200 permille both directions; neutral 1500 us; deadband 25 us; window 700..2300 us; dir-change stop 200 ms; console commands: help
-mapping,ch1=CONT_pin2_PA3,ch2=CONT_pin1_PA2,motors=ch1_right:ch2_left,range_us=1000:2000,neutral_us=1500,deadband_us=25,limit_permille=200,window_us=700:2300,dir_stop_ms=200,cmd_full_scale=127,fw=0.3.1
+VCB pixhawk-pwm reversible 0.3.2; limit 200 permille both directions; neutral 1500 us; deadband 25 us; window 700..2300 us; dir-change stop 200 ms; console commands: help
+mapping,ch1=CONT_pin2_PA3,ch2=CONT_pin1_PA2,motors=ch1_right:ch2_left,range_us=1000:2000,neutral_us=1500,deadband_us=25,limit_permille=200,window_us=700:2300,dir_stop_ms=200,cmd_full_scale=127,fw=0.3.2
 pwm,ms,ch1_us,ch1_period_us,ch1_valid,ch1_raw_permille,ch1_applied_permille,ch1_ok,ch1_bad,ch1_ovr,ch2_us,...,ch2_ovr,ch1_cmd,ch2_cmd,ch1_glitch,ch2_glitch
 status,ms,thruster_state,armed,estop_24v_present,tsms_24v_present,lsc_closed,hsc_closed,bus_mv,fault_code,interlock_faults,cmd_source
 pwm,12345,1500,20000,1,0,0,617,0,0,1499,20001,1,0,0,617,0,0,0,0,41,40
