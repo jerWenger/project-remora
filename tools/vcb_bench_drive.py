@@ -12,9 +12,10 @@ vcb-logger service (this tool only writes to the port and watches vcb.json).
     python3 tools/vcb_bench_drive.py --off       # 'bench off' (back to the PWM inputs)
 
 Sequence of a run: 'bench on' -> 'bench 0 0' at 10 Hz until the VCB arms and reaches RUN
-(it closes the contactors by itself, 1 s after the command stream is at zero) -> ramp to the
-target over --ramp s -> hold --seconds -> (with --flip: jump to the opposite sign, hold again)
--> ramp down -> zero for 1 s -> 'bench off'.
+(it closes the contactors by itself, 1 s after the command stream is at zero) -> --warmup s
+at zero in RUN (default 8: the motor controllers boot when the contactors give them HV) ->
+ramp to the target over --ramp s -> hold --seconds -> (with --flip: jump to the opposite
+sign, hold again) -> ramp down -> zero for 1 s -> 'bench off'.
 Aborts (zero, then 'bench off') on Ctrl-C, on any fault code, if the VCB leaves RUN, or if
 vcb.json goes stale. --max (default 100 permille = 10 %) is this tool's cap; the firmware
 has the same cap (BENCH_LIMIT_PERMILLE) and the usual THRUST_LIMIT_PERMILLE above it.
@@ -112,7 +113,7 @@ def main():
     ap.add_argument("--ramp", type=float, default=1.0, help="ramp up / down time, s")
     ap.add_argument("--max", type=int, default=100, help="refuse |permille| above this (firmware caps at BENCH_LIMIT_PERMILLE too)")
     ap.add_argument("--flip", action="store_true", help="after the hold, command the opposite sign directly for another --seconds (reversal test)")
-    ap.add_argument("--warmup", type=float, default=0.0, help="seconds at zero in RUN before the ramp (the motor controllers get HV power only when the contactors close and need a few seconds to boot)")
+    ap.add_argument("--warmup", type=float, default=8.0, help="seconds at zero in RUN before the ramp; the motor controllers get HV power only when the contactors close and need several seconds to boot (measured 2026-10-25); 0 to skip")
     ap.add_argument("--yes", action="store_true", help="skip the props-off confirmation")
     ap.add_argument("--stop", action="store_true", help="send 'stop' and exit")
     ap.add_argument("--clear", action="store_true", help="send 'clear' and exit")

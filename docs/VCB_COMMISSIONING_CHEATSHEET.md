@@ -46,18 +46,18 @@ openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; reset run; exit
 # 0.1  dump what is on the board today (J) without resetting it, compare with the August dump
 #      (mode=hotplug / halt+resume: the VCB keeps running; the August dump is in the checkout)
 tail -3 "$(ls -t ~/vcblogs/*.csv | head -1)"      # first: what the running build says it is (old build: mapping,...clamp_above_us=1200)
-sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
   -c "init; halt; dump_image $HOME/VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; resume; exit"
-sudo chown boat:boat ~/VCB_flash_*.bin
+#   (udev rule for the STLINK is installed; before it was, this needed sudo and a chown afterwards)
 #   or: STM32_Programmer_CLI -c port=SWD mode=hotplug -u 0x08000000 0x100000 ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin
 cmp -l ~/VCB_flash_<new>.bin firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin | wc -l   # 0 = same build as August
 cp ~/VCB_flash_<new>.bin firmware/ && git add firmware/VCB_flash_<new>.bin                   # keep it; commit with the results
 
 # 0.2  flash the committed binary (J); it is in the checkout, no copying needed
 sha256sum firmware/VCB-pixhawk-0.3.2.bin           # 9bb6c56c40c25aeb7549df6619035518c5c62ffedaf4c457380190989496883d
-sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.2.bin 0x08000000 verify reset exit"
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.2.bin 0x08000000 verify reset exit"
 #   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.2.bin 0x08000000 -v -rst
-#   (sudo until the STLINK udev rule below is in; the VCP /dev/vcb already has one)
+#   (no sudo needed since the STLINK udev rule below went in on 2026-10-25)
 #   window 1 must show:  VCB pixhawk-pwm reversible 0.3.2; ...
 #   once only, so openocd works as boat from then on:
 #   echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="3754", MODE="0666"' | sudo tee /etc/udev/rules.d/60-stlink.rules
@@ -90,16 +90,21 @@ python3 tools/vcb_bench_check.py --pwm 2250,2300,2350,650 --hold 3      # only i
 
 ## Stage 1: safety, contactors open (Pixhawk unplugged from CONT)
 
+Kill chain as built: TSMS switch = contactor coils; per-motor HV disconnects downstream of the
+contactors (the VCB cannot see them); pack main disconnect. The VCB's E-stop sense is not wired.
+
 ```sh
-# 1.1-1.3  physical: E-stop x3, TSMS x3, battery disconnect. Watch window 2:
-#          status.estop_24v_present / tsms_24v_present / bus_mv ; meter on the coil feed
-# 1.4-1.5  E-stop pressed (then TSMS pulled), plug the Pixhawk in at neutral:
-#          window 1: ARMED -> THRUSTER STARTUP_LSC ... -> FAULT 3 ... x3 -> FAULT latched. Then unplug, reset:
+# 1.1  TSMS off/on x3: window 2 status.tsms_24v_present follows (0 off, 1 on); meter on the coil feed
+# 1.2  each motor disconnect open/closed x3: meter on that motor's HV feed; note which disconnect is which motor
+# 1.3  pack main disconnect off: bus dead at the contactor input (meter), BMS reader agrees
+# 1.4  TSMS off, plug the Pixhawk in at neutral (DONE 2026-10-25):
+#      window 1: ARMED -> THRUSTER STARTUP_LSC ... -> FAULT 3 ... x3 -> FAULT latched. Then unplug, reset:
 openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; reset run; exit"
+# 1.5  status.estop_24v_present reads 1 whatever you do: nothing is wired to it (2026-10-25)
 # 1.6  software stop / clear
 vcb stop                      # FAULT 9 ..., FAULT latched: stop command
 vcb clear                     # CLEAR: stop un-latched ...
-# 1.7  by inspection: what loses power on E-stop (converter? motors? coils only?) -> checklist
+# 1.7  what each kill reaches: TSMS -> contactors (whole bus); motor disconnect -> that motor only; pack -> all HV
 ```
 
 ## Stage 2: VCB arm, start-up, disarm, zero throttle (pack on)
@@ -110,9 +115,11 @@ Power-up order: Pixhawk (disarmed, outputs 1500) → TSMS in, E-stop released �
 # 2.1  hands off; window 1: ARMED ... STARTUP_LSC ... STARTUP_WAIT ... STARTUP_HSC ... RUN ; window 2: state 5, cmd 0/0
 # 2.2  meter at the contactor output vs status.bus_mv (within 1 V)
 # 2.3  10 min in RUN, fault_code stays 0
-# 2.4  E-stop in RUN -> FAULT 8, lsc/hsc_closed 0, "FAULT latched". Release: must stay open. Reset:
+# 2.4  TSMS off in RUN (zero run below, then flip the switch) -> FAULT 8, lsc/hsc_closed 0, "FAULT latched".
+#      TSMS back on: contactors must stay open. Reset:
+python3 tools/vcb_bench_drive.py --right 0 --left 0 --seconds 60
 openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; reset run; exit"
-# 2.5  same with TSMS
+# 2.5  open one motor disconnect at zero thrust in RUN: the VCB stays RUN (it cannot see it)
 # 2.6  pull CONT in RUN -> FAULT 1 within 100 ms ; plug back -> "FAULT cleared" (3 s) -> ARMED (1 s) -> RUN
 # 2.7  reboot the Pixhawk in RUN (QGC: Reboot Vehicle) -> FAULT 1 -> recovery
 # 2.8  arm the Pixhawk in Manual and nudge throttle during the 1.5 s start-up -> "DISARMED: throttle left neutral before RUN"
@@ -129,7 +136,10 @@ python3 tools/vcb_bench_drive.py --right 0 --left 0 --seconds 30     # then Ctrl
 
 ## Stage 3: Jetson drives the motors at 5 %, props off
 
-Pixhawk unplugged from CONT or left in: bench mode ignores the PWM inputs. 50 permille = 5 % = byte ±6.
+Pixhawk unplugged from CONT. 50 permille = 5 % = byte ±6; 100 = 10 % = byte ±13 (the bench cap).
+The tool holds zero in RUN for 8 s before the ramp (`--warmup`, default 8): the motor controllers
+only get HV when the contactors close and need that long to boot (2026-10-25). Close motor
+disconnects only while the contactors are open (VCB in IDLE). 3.1, 3.2, 3.4 done 2026-10-25.
 
 ```sh
 # 3.1  right forward: which motor, which way?
@@ -151,13 +161,15 @@ vcb bench on; vcb bench 300 0; vcb bench off                                  # 
 python3 tools/vcb_bench_drive.py --right 50 --left 0 --seconds 30
 kill -9 $(pgrep -f vcb_bench_drive.py)       # <= 500 ms later: FAULT 1 "bench command lost", motor stops
 vcb bench off                                # tidy up; the VCB recovers to IDLE on its own after 3 s of neutral
-# 3.8  E-stop during a run -> FAULT 8, motor stops. Note what actually stopped it. Reset the VCB afterwards.
+# 3.8  open that motor's HV disconnect during a run: motor stops at once, VCB stays RUN (cannot see it)
 # 3.9  software stop during a run (second shell)
 vcb stop                                     # FAULT 9, motor stops
 vcb clear
 # 3.10 direct reversal through the 200 ms zero hold (cmd 6 -> 0 -> -6), each side
 python3 tools/vcb_bench_drive.py --right 50 --left 0 --seconds 3 --flip
 python3 tools/vcb_bench_drive.py --right 0 --left 50 --seconds 3 --flip
+# 3.11 5 % with the warm-up: full 10 s, or is 5 % under the motor's floor?
+python3 tools/vcb_bench_drive.py --right 50 --left 0 --seconds 10
 ```
 
 If 3.1 shows the wrong motor or the wrong direction: it is fixed in `firmware/VCB-pixhawk/Core/Src/eprop.cpp`
@@ -166,7 +178,9 @@ If 3.1 shows the wrong motor or the wrong direction: it is fixed in `firmware/VC
 ## Stage 4: Pixhawk motor test, props off (Pixhawk on CONT, `vcb bench off`)
 
 `--live` requires the VCB in RUN with no fault and asks for a typed confirmation; it prints
-measured µs, raw/applied permille and `cmd` for each step.
+measured µs, raw/applied permille and `cmd` for each step. Pre-arm blockers found 2026-10-25:
+`Compass not calibrated`, `Battery 1 unhealthy`. For the bench only:
+`printf 'ARMING_SKIPCHK,260\n' > /tmp/skip.parm && python3 tools/ap_apply.py /tmp/skip.parm` (clear after).
 
 ```sh
 # 4.1  right forward (AUX1 -> ch1 -> right motor?)

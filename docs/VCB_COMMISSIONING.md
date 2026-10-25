@@ -16,6 +16,67 @@ sign-off lines and value fields (source: `VCB_COMMISSIONING_CHECKLIST.html`, ren
 headless Chrome); `VCB_COMMISSIONING_CHEATSHEET.md` has every command in test order and is
 the PDF's appendix.
 
+## Results log
+
+### 2026-10-25, first session with the motors (0.3.0 → 0.3.2)
+
+What was found and done, in order:
+
+- The board was running the later "tolerant" build (993 µs read as `valid`), not the August
+  dump, latched in fault 3 because the TSMS was off. A fresh dump was taken with openocd;
+  **copy `~/VCB_flash_*.bin` into `firmware/` and commit it** (not yet done).
+- No `STM32_Programmer_CLI` on the Jetson; openocd 0.12 is at `/usr/local/bin`. The STLINK's
+  debug interface needed `sudo` until the udev rule in the cheat sheet went in.
+- 0.3.0 flashed: console proven both ways (banner, `bench` commands answered). Its PWM capture
+  never qualified: sub-µs glitches on both CONT lines, ~200/s, counted as bad pulses. 0.3.1
+  (8 µs input filter, rising on CH3 / falling on CH4, glitch pairs discarded) fixed it: 993 µs /
+  20067 µs, `bad` 0, glitch counters 0. Timebase +0.3 %, inside the deadband.
+- `params/vcb-pixhawk.parm` applied. On the new 1500 µs idle the VCB armed after 1 s, warned
+  TSMS absent, energised the LSC, `FAULT 3` after 1 s, recovered after 3 s neutral, re-armed,
+  and latched after the fourth fault: arming, retry and latch paths all as designed.
+- **Kill chain, as built:** the TSMS switch feeds the contactor coils (LSC cannot close with
+  it off, proven twice). The "E-stops" are per-motor HV disconnects downstream of the
+  contactors; the VCB cannot see them. The VCB's E-stop sense input reads "present" whatever
+  is pressed: nothing is wired to it, so fault 8 can only come from TSMS. TSMS sense follows
+  the switch (0 off, 1 on).
+- First live precharge through bench mode: LSC closed, HSC closed, bus 53.7–54.0 V, RUN with
+  `cmd` 0/0. About eight closures over the session, all clean; `bench off` opened the contactors
+  every time. VCB `bus_mv` reads ~1.2 V above the BMS (meter check still to do).
+- Motors, one at a time then both: ePropulsion **address 1 is the right motor, address 2 the
+  left**, the reverse of cttdev's comment; 0.3.2 swaps them. Positive = forward, confirmed.
+  Both motors at 10 % (byte 13) for 10 s, ~0.9 A each above idle, dry.
+- The motor controllers only get HV when the contactors close and take several seconds to
+  boot: at 5 % with no delay the motor started late and stopped early; with 8 s of zero in RUN
+  first (`--warmup 8`, now the tool's default) 10 % held the full 10 s. 5 % with warmup not
+  yet tried, so whether 5 % is under the motor's floor is open.
+- Deviation: these runs were made dry with the **props on**, everyone clear. Don't repeat
+  above 10 % or beyond 30 s dry; the motors cool through the water.
+- ArduPilot motor test rejected: `PreArm: Compass not calibrated`, `PreArm: Battery 1
+  unhealthy`. Stage 0.6 sweeps and stage 4 wait on that (`ARMING_SKIPCHK` 260 for the bench, or
+  calibrate the compass and fix the POWER1 monitor).
+- The Jetson rebooted several times from network changes on the operator's side (not TSMS,
+  not precharge); the STLINK dropped off USB with each and needed a replug.
+
+Rows done: 0.1–0.4, 0.7, 1.1 (TSMS part), 1.4 (as TSMS), 1.7, 2.1, 2.10, 2.11, 2.12, 3.1, 3.2,
+3.4 (at 10 %), 3.6 (10 % part). Not done: 0.6, 1.3, 1.6, 2.2 (meter), 2.3, 2.4, 2.5–2.9, 3.3,
+3.5, 3.7–3.11.
+
+**Next session, in order:**
+
+1. Commit the flash dump. Pixhawk off CONT, kill chain up, props off or boat in the water.
+2. **2.4: TSMS off during a zero run** → `FAULT 8`, contactors open, latched. The one kill
+   with the contactors closed that has not been exercised. Then 2.5 (motor disconnect at zero).
+3. Rest of stage 3 with `--warmup` (default 8 s): reverse each side (3.3), `--flip` (3.10),
+   30 s run with `kill -9` (3.5/3.7), motor disconnect opened while turning (3.8), `vcb stop`
+   (3.9), and 5 % with warmup (3.11).
+4. 2.2 meter against `bus_mv`; 2.3 ten-minute soak; then Pixhawk back on CONT for 2.6–2.9.
+5. ArduPilot: compass calibration and the battery-1 monitor, or `ARMING_SKIPCHK` 260 for the
+   bench; then 0.6 and stage 4.
+6. Decisions: wire the VCB's E-stop sense to something real (e.g. the motor disconnects) or
+   document it as unused; add a firmware RUN warm-up (zero for a few seconds after the
+   contactors close, so Pixhawk/RC commands never hit a booting controller); correct the bus
+   scalar after the meter check.
+
 ## What you need on the bench
 
 | Item | Why |
@@ -61,26 +122,30 @@ Pack disconnected. Can be done now.
 ## Stage 1: safety: every kill path, with the contactors open
 
 Goal: prove each way of removing power before anything can close a contactor. Pack
-connected, VCB powered, Pixhawk **unplugged from the CONT port** (or outputs invalid), so
-the VCB cannot arm: `thruster_state` 1, `armed` 0 throughout. If the VCB arms during this
-stage, stop and find out why.
+connected, VCB powered, Pixhawk **unplugged from the CONT port** so the VCB cannot arm:
+`thruster_state` 1, `armed` 0 throughout.
 
-| Step | Do | Watch | Pass |
+The kill chain as built (2026-10-25): the **TSMS switch** feeds the contactor coils; two
+**per-motor HV disconnects** sit downstream of the contactors, one per motor, invisible to
+the VCB; the **pack main disconnect** kills everything HV. The VCB's E-stop sense input is
+not wired to any of them (it reads "present" permanently); only the TSMS sense is real.
+
+| Step | Do | Watch | Pass | Done |
+|---|---|---|---|---|
+| 1.1 | TSMS off / on, three times | `tsms_24v_present` follows (0 off, 1 on); meter on the coil feed | the coil feed loses 24 V with the switch off | sense 2026-10-25 |
+| 1.2 | Each motor disconnect open / closed, three times | meter on that motor's HV feed; the VCB shows nothing | the motor feed is dead with its disconnect open; note which disconnect is which motor | |
+| 1.3 | Pack main disconnect off | `bus_mv` at the contactor input side (meter), BMS reader | the HV side is dead at the contactor input | |
+| 1.4 | With TSMS **off**, plug the Pixhawk in at neutral so the VCB arms and tries to start | `ARMED`, `STARTUP_LSC`, then `FAULT 3` (LSI timeout) within 1 s; `lsc_closed` stays 0 | a contactor cannot close with TSMS off. Three retries, then `FAULT latched`. Unplug the Pixhawk, reset the VCB | 2026-10-25 |
+| 1.5 | E-stop sense | `estop_24v_present` while operating every kill | it reads 1 throughout: nothing is wired to it. Decide: wire it (motor disconnect status?) or document it as unused | 2026-10-25 (reads 1) |
+| 1.6 | `vcb stop` while IDLE, then `vcb clear` | `FAULT 9`, `FAULT latched: stop command`; clear un-latches | the software stop works end to end (a convenience, not a safety device) | |
+| 1.7 | What loses power with each kill | by inspection and meter | TSMS: contactor coils, so the whole bus. Motor disconnect: that motor only, the VCB keeps commanding it. Pack disconnect: everything HV | 2026-10-25 |
+
+**Gate 1:** TSMS removes coil power and blocks a start-up; each motor disconnect kills its
+motor; the software stop works; what each kill reaches is written down.
+
+| date | pass/fail | which disconnect = which motor | notes |
 |---|---|---|---|
-| 1.1 | E-stop pressed / released, three times | `estop_24v_present` follows; meter on the contactor coil feed | the coil feed loses 24 V when pressed. Record which way the sense reads (polarity is an open question) |
-| 1.2 | TSMS pulled / inserted, three times | `tsms_24v_present`; coil feed | same |
-| 1.3 | Main battery disconnect / BMS off | `bus_mv` at the contactor input side (meter), BMS reader | the HV side is dead at the contactor input |
-| 1.4 | With the E-stop **pressed**, plug the Pixhawk in at neutral so the VCB arms and tries to start | `ARMED`, `STARTUP_LSC`, then `FAULT 3` (LSI timeout) within 1 s; `lsc_closed` stays 0 | a contactor cannot close with the E-stop pressed. Three retries, then `FAULT latched`. Unplug the Pixhawk, reset the VCB |
-| 1.5 | Same with TSMS pulled | same | same |
-| 1.6 | `echo stop > /dev/vcb` while IDLE | `FAULT 9`, `FAULT latched: stop command`; `echo clear > /dev/vcb` un-latches | the software stop works end to end (it is a convenience, not a safety device) |
-| 1.7 | Walk the kill chain physically: which devices lose power when the E-stop is pressed (converter? motors? only the coils?) | by inspection and meter | written down. Stage 3.8 tests it with a motor turning |
-
-**Gate 1:** both hardware kills remove coil power and block a start-up; the software stop
-works; sense polarity recorded.
-
-| date | pass/fail | estop sense polarity | tsms sense polarity | what loses power on E-stop | notes |
-|---|---|---|---|---|---|
-| | | | | | |
+| 2026-10-25 | partial (1.1 sense, 1.4, 1.7) | | 1.2, 1.3, 1.6 to do |
 
 ## Stage 2: VCB arm, start-up, disarm, zero throttle
 
@@ -98,14 +163,14 @@ power-on.
 | 2.1 | VCB power on, hands off | `ARMED`, then `thruster_state` 1 → 2 → 3 → 4 → 5 within ~2 s; `lsc_closed` then `hsc_closed` = 1; `bus_mv` rises to the pack voltage | RUN reached, `cmd` 0/0, no fault |
 | 2.2 | Compare `bus_mv` with the meter at the contactor output | `status.bus_mv` | agree within 1 V. If not, the 28.27 divider scalar in `config.h` is wrong for this board; fix before stage 3, the 40 V / 35 V thresholds depend on it |
 | 2.3 | Stay in RUN 10 min | `fault_code` 0, `cmd` 0/0, contactor coils and precharge resistor temperature by hand | nothing warms up unexpectedly |
-| 2.4 | **E-stop in RUN** (the dynamic half of stage 1) | `FAULT 8` within ~50 ms, `lsc_closed` / `hsc_closed` → 0, `FAULT latched`, `armed` 0 | contactors open **and stay open after the E-stop is released** (fault 8 is latched by design) |
-| 2.5 | VCB reset, 2.1 again, then TSMS pulled in RUN | as 2.4 | as 2.4 |
+| 2.4 | **TSMS off in RUN** (the dynamic half of stage 1; zero run of `vcb_bench_drive.py` is the easy way) | `FAULT 8` within ~50 ms, `lsc_closed` / `hsc_closed` → 0, `FAULT latched`, `armed` 0 | contactors open **and stay open after TSMS is switched back on** (fault 8 is latched by design). Not yet done |
+| 2.5 | VCB reset, 2.1 again, then open one motor disconnect in RUN at zero thrust | the VCB sees nothing: stays RUN, `cmd` 0/0 | expected; note whether the converter reports anything on the console (it does not talk back today) |
 | 2.6 | VCB reset, 2.1 again, then pull the CONT cable in RUN | `FAULT 1` within 100 ms, contactors open, `DISARMED` | stop. Plug back at neutral: `FAULT cleared` after 3 s, `ARMED` 1 s later, start-up, RUN: recovers without a power cycle |
 | 2.7 | Reboot the Pixhawk while in RUN | outputs vanish → `FAULT 1`; on return at 1500 µs → recovery as in 2.6 | stop, then recover |
 | 2.8 | Move a Pixhawk output off neutral while the VCB is armed but not yet in RUN (Pixhawk armed in Manual, stick nudged, during the 1.5 s start-up) | `DISARMED: throttle left neutral before RUN`, start-up aborted | the first command in RUN is always zero |
 | 2.9 | `stop` on the console in RUN; then `clear` | `FAULT 9`, contactors open; after `clear` and 3 s neutral, recovery | the software stop and its recovery work with the bus live |
 | 2.10 | VCB reset, pack disconnected (bus dead) | `FAULT 6` (bus < 40 V after HSC), up to 3 retries, then `FAULT latched` | the retry limit works; the precharge resistor is not hot after 4 attempts |
-| 2.11 | Bench-mode arming: Pixhawk unplugged, `tools/vcb_bench_drive.py --right 0 --left 0 --seconds 5` | `cmd_source` 1, `ARMED`, start-up, RUN with `cmd` 0/0 for 5 s, then `bench off` → `DISARMED: bench off`, contactors open, IDLE. Run it again and Ctrl-C mid-way: same clean exit | the console command path arms and disarms cleanly, nothing turns |
+| 2.11 | Bench-mode arming (done 2026-10-25): Pixhawk unplugged, `tools/vcb_bench_drive.py --right 0 --left 0 --seconds 5` | `cmd_source` 1, `ARMED`, start-up, RUN with `cmd` 0/0 for 5 s, then `bench off` → `DISARMED: bench off`, contactors open, IDLE. Run it again and Ctrl-C mid-way: same clean exit | the console command path arms and disarms cleanly, nothing turns |
 | 2.12 | Three clean power cycles in a row with the pack on | RUN each time | start-up is repeatable |
 
 **Gate 2:** RUN reached 3/3, bus reading trusted, E-stop and TSMS each open the contactors
@@ -122,9 +187,13 @@ Jetson writing `bench R L` lines to `/dev/vcb`, no Pixhawk in the loop (unplug i
 CONT, or leave it; bench mode ignores the PWM inputs). 50 permille = 5 % = converter byte
 ±6. The firmware caps bench commands at 10 % whatever the tool asks for.
 
-`tools/vcb_bench_drive.py` runs each row: `bench on`, zero until RUN, 1 s ramp, hold, ramp
-down, `bench off`. It aborts to zero and `bench off` on Ctrl-C, on any fault, or if the VCB
-leaves RUN. Watch the dashboard thruster card and the BMS current alongside.
+`tools/vcb_bench_drive.py` runs each row: `bench on`, zero until RUN, **8 s of zero in RUN
+while the motor controllers boot** (`--warmup`, default 8; they only get HV when the
+contactors close, and without it a 5 % command started late and stopped early on
+2026-10-25), 1 s ramp, hold, ramp down, `bench off`. It aborts to zero and `bench off` on
+Ctrl-C, on a new fault, or if the VCB leaves RUN. Watch the dashboard thruster card and the
+BMS current alongside. 3.1, 3.2 and 3.4 were done on 2026-10-25 (at 10 % for 3.4): address 1
+is the right motor, address 2 the left (fixed in 0.3.2), positive is forward.
 
 | Step | Command | Watch | Pass |
 |---|---|---|---|
@@ -135,9 +204,10 @@ leaves RUN. Watch the dashboard thruster card and the BMS current alongside.
 | 3.5 | `--right 50 --left 0 --seconds 30` | steady, `bad` counters not moving | 30 s without the converter dropping the motor |
 | 3.6 | `--right 100 --left 100 --seconds 5` | `cmd` 13 (10 %, the bench cap) | runs; then `--right 300 --left 0` must be refused by the tool, and `echo "bench 300 0"` by hand must print `BENCH: clamped to 100 0` |
 | 3.7 | During a `--seconds 30` run: kill the tool with `kill -9` (not Ctrl-C) | no `bench` lines for 500 ms → `FAULT 1`, `DISARMED: bench command lost`, motors stop, contactors open | a dead Jetson process stops the motors |
-| 3.8 | During a run: **E-stop** | `FAULT 8`, motor stops | the motor must stop or coast, not keep running on the converter's last command. This is the answer to stage 1.7: whether opening the contactors removes motor power, or only the stop frame does |
+| 3.8 | During a run: **open that motor's HV disconnect** | the motor stops at once; the VCB stays in RUN and keeps commanding it (it cannot see the disconnect) | the fastest kill for a turning motor; note whether the converter minds when the disconnect is closed again (only with the contactors open) |
 | 3.9 | During a run: `stop` from a second terminal | `FAULT 9`, motor stops | software stop with a motor turning |
 | 3.10 | Reversal through zero: `--right 50 --left 0 --seconds 3 --flip` (3 s at +5 %, then −5 % commanded directly) | `ch1_cmd` 6 → 0 (200 ms) → −6; the motor reverses without the converter dropping it | reversal works at low thrust (repeated at 20 % in 4.6). Same on the left |
+| 3.11 | `--right 50 --left 0 --seconds 10` (5 % with the default warm-up) | runs the full 10 s, or starts and quits | tells whether 5 % is under the motor's own floor; if it is, the usable band starts higher and Rover's `MOT_THR_MIN` should say so |
 
 **Gate 3:** motor identity and direction known (firmware corrected and re-flashed if not),
 both directions on both motors, both together, 30 s steady, every stop path with a motor
@@ -159,7 +229,9 @@ the VCB in RUN with no fault, asks for a typed props-off confirmation, prints th
 measured µs, raw/applied permille and `cmd` bytes for each step, and returns the output to
 1500 µs if the VCB leaves RUN. A servo tester on the CONT pins gives exact widths. Every
 command is 2 s unless stated; start every step from RUN with `cmd` 0/0. The commands for
-every row are in `VCB_COMMISSIONING_CHEATSHEET.md`.
+every row are in `VCB_COMMISSIONING_CHEATSHEET.md`. On 2026-10-25 the motor test was refused
+by the pre-arm checks (`Compass not calibrated`, `Battery 1 unhealthy`): calibrate the compass
+and sort out the POWER1 battery monitor, or `ARMING_SKIPCHK` 260 for the bench, cleared after.
 
 | Step | Command | Watch | Pass |
 |---|---|---|---|
@@ -245,14 +317,14 @@ build failed.
 
 | Question (firmware README / HARDWARE.md) | Answered at |
 |---|---|
-| Which build is on the VCB today | 0.1 |
-| Console port and baud; does console input work | 0.2, 0.3 |
-| HSI timebase offset, deadband adequate | 0.7 |
-| E-stop / TSMS sense polarity; do the coils really lose power | 1.1, 1.2, 1.4, 1.5 |
-| What loses power on E-stop; what actually stops a turning motor | 1.7, 3.8 |
-| `bus_mv` calibration | 2.2 |
+| Which build is on the VCB today | 0.1: the later "tolerant" build (2026-10-25) |
+| Console port and baud; does console input work | 0.2, 0.3: UART4 115200, both ways (2026-10-25) |
+| HSI timebase offset, deadband adequate | 0.7: +0.3 %, fine (2026-10-25) |
+| E-stop / TSMS sense polarity; do the coils really lose power | 1.1, 1.4, 1.5: TSMS sense 0/1 and coils follow it; E-stop sense unwired (2026-10-25) |
+| What loses power with each kill; what actually stops a turning motor | 1.7 answered 2026-10-25; 3.8 pending |
+| `bus_mv` calibration | 2.2: reads ~1.2 V above the BMS; meter check pending |
 | Can the precharge path take repeated attempts | 2.10 |
-| Physical left/right and forward direction | 3.1–3.3 |
+| Physical left/right and forward direction | 3.1, 3.2: address 1 right, 2 left, positive forward (2026-10-25) |
 | Converter's reaction to a direction change; is the 200 ms hold needed | 3.10, 4.6, 4.7 |
 | Converter full scale 127 or 100 | 4.8 |
 | Is "VCB stays in RUN when Rover disarms" acceptable | 4.9 |

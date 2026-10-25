@@ -11,10 +11,13 @@ input filter, rising edge on CH3 and falling on CH4 as in the deployed build, gl
 discarded without touching the period, `chN_glitch` counters in the telemetry). 0.3.1 was
 flashed the same day: both channels qualify (993 us / 20067 us, `bad` 0, glitch counters 0,
 so the filter alone removes the glitches). Same day, through bench mode: first live precharge
-and RUN (bus 53.8 V), TSMS proven as the contactor kill, both motors turned at 5 % one at a
-time, which showed the ePropulsion addresses are the reverse of cttdev's comment: 0.3.2 swaps
-them. Commissioning continues in `docs/VCB_COMMISSIONING.md`.** Read "Before flashing" and
-"Bench test plan" below.
+and RUN (bus 53.8 V), TSMS proven to hold the contactor coils, both motors turned one at a
+time and then together at 10 %, which showed the ePropulsion addresses are the reverse of
+cttdev's comment: 0.3.2 swaps them (mapping measured with one motor commanded at a time; not
+re-run after the swap). The motor controllers need several seconds after the contactors close
+before they answer a command. Not yet exercised: reverse, fault 8 (TSMS opened in RUN), the
+stop paths with a motor turning. Results and the next-session list:
+`docs/VCB_COMMISSIONING.md`.** Read "Before flashing" and "Bench test plan" below.
 
 ## Where it comes from
 
@@ -49,7 +52,7 @@ is organised around it: see "End points are pinned" under "PWM contract".
 | MCB "LARS", "REEL" | UART7, USART3 | only `idle\n` is sent, 10 Hz |
 | LSC / HSC control | PD5 / PD6 | contactor coils |
 | LSI / HSI sense | PD4 / PD3 | low = closed |
-| E-stop / TSMS 24 V sense | PA9 / PA10 | read and reported; not acted on (see `REQUIRE_ESTOP_TSMS_TO_START`) |
+| E-stop / TSMS 24 V sense | PA9 / PA10 | read and reported; not acted on (see `REQUIRE_ESTOP_TSMS_TO_START`). On the boat (2026-10-25) PA9 reads "present" permanently: nothing is wired to it; PA10 follows the TSMS switch |
 | HV bus voltage | ADC1 IN3 differential | (30k+30k+2.2k)/2.2k divider |
 | LEDs | CTL3 red, CTL2 orange, CTL1 green | see "LEDs" |
 
@@ -363,8 +366,13 @@ the bus voltage thresholds, the telemetry periods.
 - The converter's full scale: cttdev's code sends 0x7F for 100 % and this build keeps that
   (`EPROP_FULL_SCALE_VALUE`). If it is really 100, the default 20 % limit is 25 % at the
   motor. Bench step 5 is where to notice.
-- The E-stop and TSMS sense polarity, and whether the contactor coils really lose power
-  when either is pulled. Fault code 8 assumes they do.
+- Whether the contactors really open when the TSMS is switched off in RUN (fault 8). The
+  coils do lose power with it off (the LSC cannot close), so they should; not yet seen live.
+  The E-stop sense is not wired on this boat, and the "E-stops" are per-motor HV disconnects
+  the VCB cannot see.
+- Whether 5 % is below the motors' own floor. The controllers also need several seconds
+  after the contactors close before they answer a command (`vcb_bench_drive.py --warmup`);
+  a firmware RUN warm-up (zero for a few seconds after entering RUN) is the obvious next change.
 - Physical left/right: see "PWM contract".
 - Whether the precharge path can take repeated start-up attempts (hence the retry limit).
 - Where the CONT-line glitches come from. They are on both lines at once, roughly every

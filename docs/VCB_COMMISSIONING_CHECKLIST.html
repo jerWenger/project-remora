@@ -35,7 +35,7 @@ pre { font: 7.4pt/1.28 Menlo, Monaco, monospace; white-space: pre-wrap; border: 
 </style></head><body>
 
 <h1>HighFieldBoat VCB commissioning checklist</h1>
-<p class="sub">Plan: <code>docs/VCB_COMMISSIONING.md</code> &middot; commands: <code>docs/VCB_COMMISSIONING_CHEATSHEET.md</code> (also the appendix here) &middot; firmware <code>firmware/VCB-pixhawk</code> 0.3.1 &middot; printed 2026-10-20</p>
+<p class="sub">Plan: <code>docs/VCB_COMMISSIONING.md</code> &middot; commands: <code>docs/VCB_COMMISSIONING_CHEATSHEET.md</code> (also the appendix here) &middot; firmware <code>firmware/VCB-pixhawk</code> 0.3.1 &middot; printed 2026-10-25</p>
 
 <div class="fields">
 Firmware version flashed <span class="f"></span> Flash dump of the old build <span class="f" style="min-width:220px"></span><br>
@@ -99,15 +99,15 @@ Fault codes: 1 command lost &middot; 2&ndash;7 contactor/bus interlock &middot; 
 <div class="fields">Date <span class="f"></span> Operator <span class="f"></span> E-stop person <span class="f"></span></div>
 <p class="pre"><span class="cb"></span>Pixhawk unplugged from CONT &nbsp; <span class="cb"></span>Meter on the contactor coil feed &nbsp; <span class="cb"></span>Props off &nbsp; <span class="cb"></span>Console windows open</p>
 <table class="steps"><colgroup><col style="width:16px"><col style="width:30px"><col style="width:30%"><col style="width:35%"><col style="width:72px"><col></colgroup><thead><tr><th></th><th>#</th><th>Do</th><th>Expect</th><th>P / F</th><th>Values / notes</th></tr></thead><tbody>
-<tr><td class="c"><span class="cb"></span></td><td class="n">1.1</td><td>E-stop pressed / released &times; 3</td><td><code>estop_24v_present</code> follows; coil feed loses 24 V when pressed</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">sense reads ___ pressed / ___ released</td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">1.2</td><td>TSMS pulled / inserted &times; 3</td><td><code>tsms_24v_present</code> follows; coil feed loses 24 V when pulled</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">sense reads ___ pulled / ___ in</td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">1.1</td><td>TSMS off / on &times; 3</td><td><code>tsms_24v_present</code> follows (0 off, 1 on); coil feed loses 24 V with the switch off</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">sense ok 2026-10-25</td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">1.2</td><td>Each motor HV disconnect open / closed &times; 3</td><td>Meter: that motor's feed dead with its disconnect open; VCB shows nothing</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">right disc = ___ motor &nbsp; left disc = ___ motor</td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">1.3</td><td>Main battery disconnect / BMS off</td><td>HV dead at the contactor input (meter); BMS reader agrees</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">1.4</td><td>E-stop <b>pressed</b>; plug Pixhawk in at neutral so the VCB arms and tries to start</td><td><code>ARMED</code>, <code>STARTUP_LSC</code>, <code>FAULT 3</code> within 1 s, <code>lsc_closed</code> stays 0; 3 retries, <code>FAULT latched</code>. Unplug, reset VCB</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">1.5</td><td>Same with TSMS pulled</td><td>Same</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">1.4</td><td>TSMS <b>off</b>; plug Pixhawk in at neutral so the VCB arms and tries to start</td><td><code>ARMED</code>, <code>STARTUP_LSC</code>, <code>FAULT 3</code> within 1 s, <code>lsc_closed</code> stays 0; 3 retries, <code>FAULT latched</code>. Unplug, reset VCB</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">done 2026-10-25</td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">1.5</td><td>E-stop sense while operating every kill</td><td><code>estop_24v_present</code> reads 1 throughout: nothing wired to it. Decide: wire it, or document as unused</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">reads 1 (2026-10-25); decision: </td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">1.6</td><td><code>vcb stop</code>, then <code>vcb clear</code></td><td><code>FAULT 9</code>, <code>FAULT latched: stop command</code>; clear un-latches</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">1.7</td><td>Walk the kill chain: what loses power on E-stop?</td><td>Written down: converter / motors / coils only</td><td class="pf"><span class="cb"></span>done</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">1.7</td><td>What each kill reaches</td><td>TSMS: coils, whole bus. Motor disconnect: that motor only, VCB keeps commanding. Pack: all HV</td><td class="pf"><span class="cb"></span>done</td><td class="notes">done 2026-10-25</td></tr>
 </tbody></table>
-<div class="gate"><span class="cb"></span> <b>Gate 1 passed</b>: both hardware kills remove coil power and block a start-up; software stop works; sense polarity recorded. <div class="sig">Date <span class="line"></span> Signed <span class="line wide"></span> Witness <span class="line"></span></div></div>
+<div class="gate"><span class="cb"></span> <b>Gate 1 passed</b>: TSMS removes coil power and blocks a start-up; each motor disconnect kills its motor; software stop works; what each kill reaches is written down. <div class="sig">Date <span class="line"></span> Signed <span class="line wide"></span> Witness <span class="line"></span></div></div>
 </div>
 
 <!-- ============================ STAGE 2 ============================ -->
@@ -120,8 +120,8 @@ Fault codes: 1 command lost &middot; 2&ndash;7 contactor/bus interlock &middot; 
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.1</td><td>VCB power on, hands off</td><td><code>ARMED</code>; state 1&rarr;2&rarr;3&rarr;4&rarr;5 in ~2 s; LSC then HSC closed; <code>bus_mv</code> rises; <code>cmd</code> 0/0</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">time to RUN: </td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.2</td><td><code>bus_mv</code> vs meter at contactor output</td><td>Within 1 V (else fix the divider scalar in <code>config.h</code> before stage 3)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">bus_mv: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; meter: </td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.3</td><td>10 min in RUN, zero throttle</td><td><code>fault_code</code> 0; coils and precharge resistor not warm</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">2.4</td><td><b>E-stop in RUN</b></td><td><code>FAULT 8</code> in ~50 ms; both contactors open; latched; stay open after release</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">2.5</td><td>Reset VCB, 2.1 again, TSMS pulled in RUN</td><td>As 2.4</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">2.4</td><td><b>TSMS off in RUN</b> (zero run of the drive tool, then flip the switch)</td><td><code>FAULT 8</code> in ~50 ms; both contactors open; latched; stay open after TSMS back on</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">2.5</td><td>Reset VCB, 2.1 again; open one motor disconnect at zero thrust</td><td>VCB stays RUN, <code>cmd</code> 0/0 (it cannot see it); converter says nothing</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.6</td><td>Reset VCB, 2.1 again, pull CONT in RUN; replug at neutral</td><td><code>FAULT 1</code> within 100 ms, contactors open; then <code>FAULT cleared</code> (3 s), <code>ARMED</code> (1 s), RUN: no power cycle</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.7</td><td>Reboot the Pixhawk in RUN</td><td><code>FAULT 1</code>; recovery as 2.6 when outputs return at 1500</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">2.8</td><td>Pixhawk armed in Manual; nudge throttle during the start-up</td><td><code>DISARMED: throttle left neutral before RUN</code>; start-up aborted</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
@@ -136,7 +136,7 @@ Fault codes: 1 command lost &middot; 2&ndash;7 contactor/bus interlock &middot; 
 <!-- ============================ STAGE 3 ============================ -->
 <div class="stage">
 <h2>Stage 3 &middot; Jetson drives the motors directly, 5 %, props off</h2>
-<p class="sub">Command path: Jetson &rarr; <code>bench R L</code> on <code>/dev/vcb</code>; no Pixhawk in the loop (bench mode ignores the PWM inputs). 50 permille = 5 % = converter byte &plusmn;6. Firmware caps bench commands at 10 %. Each row is one <code>vcb_bench_drive.py</code> invocation (cheat sheet &sect;3); it aborts to zero on Ctrl-C, fault or stale data.</p>
+<p class="sub">Command path: Jetson &rarr; <code>bench R L</code> on <code>/dev/vcb</code>; no Pixhawk in the loop. 50 permille = 5 % = converter byte &plusmn;6; 100 = 10 % = &plusmn;13, the bench cap. Each row is one <code>vcb_bench_drive.py</code> invocation (cheat sheet &sect;3): zero until RUN, <b>8 s of zero while the motor controllers boot</b>, ramp, hold, ramp down, off; it aborts to zero on Ctrl-C, a new fault or stale data. Close motor disconnects only with the contactors open. Address 1 = right motor, 2 = left (0.3.2).</p>
 <div class="fields">Date <span class="f"></span> Operator <span class="f"></span> E-stop person <span class="f"></span></div>
 <p class="pre"><span class="cb"></span><b>Props OFF, verified by a second person</b> &nbsp; <span class="cb"></span>Nobody within reach of the motors &nbsp; <span class="cb"></span>Gate 2 signed &nbsp; <span class="cb"></span>BMS reader open</p>
 <table class="steps"><colgroup><col style="width:16px"><col style="width:30px"><col style="width:30%"><col style="width:35%"><col style="width:72px"><col></colgroup><thead><tr><th></th><th>#</th><th>Command</th><th>Expect</th><th>P / F</th><th>Values / notes</th></tr></thead><tbody>
@@ -147,8 +147,9 @@ Fault codes: 1 command lost &middot; 2&ndash;7 contactor/bus interlock &middot; 
 <tr><td class="c"><span class="cb"></span></td><td class="n">3.5</td><td><code>--right 50 --left 0 --seconds 30</code></td><td>Steady 30 s; <code>bad</code> not moving; converter does not drop the motor</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">3.6</td><td><code>--right 100 --left 100 --seconds 5</code>; then <code>--right 300 --left 0</code>; then by hand <code>bench 300 0</code></td><td><code>cmd</code> 13/13 runs; tool refuses 300; firmware prints <code>BENCH: clamped to 100 0</code></td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">3.7</td><td>30 s run; <code>kill -9</code> the tool from another shell</td><td>&le; 500 ms later <code>FAULT 1</code>, <code>DISARMED: bench command lost</code>, motor stops, contactors open</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">3.8</td><td><b>E-stop during a run</b></td><td><code>FAULT 8</code>, motor stops or coasts. Record what actually stopped it (contactors cut motor power, or only the stop frame)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">stopped by: </td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">3.8</td><td><b>Open that motor's HV disconnect during a run</b></td><td>Motor stops at once; VCB stays RUN and keeps commanding it. Close it again only with the contactors open</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">converter minded? Y / N</td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">3.9</td><td><code>vcb stop</code> during a run, then <code>vcb clear</code></td><td><code>FAULT 9</code>, motor stops</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">3.11</td><td><code>--right 50 --left 0 --seconds 10</code> (5 % with the 8 s warm-up)</td><td>Full 10 s, or starts and quits: is 5 % under the motor's floor?</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">floor: </td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">3.10</td><td><code>--right 50 --left 0 --seconds 3 --flip</code>; same on the left</td><td><code>cmd</code> 6 &rarr; 0 (200 ms) &rarr; &minus;6; motor reverses, no dropout</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 </tbody></table>
 <div class="gate"><span class="cb"></span> <b>Gate 3 passed</b>: motor identity and direction known (firmware corrected if needed), both directions on both motors, both together, 30 s steady, every stop path with a motor turning stops it. <div class="sig">Date <span class="line"></span> Signed <span class="line wide"></span> Witness <span class="line"></span></div></div>
@@ -269,19 +270,19 @@ dead-bus checks</h2>
 <div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.1  dump what is on the board today (J) without resetting it, compare with the August dump</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co">#      (mode=hotplug / halt+resume: the VCB keeps running; the August dump is in the checkout)</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-3</span> <span class="st">&quot;</span><span class="va">$(</span><span class="fu">ls</span> <span class="at">-t</span> ~/vcblogs/<span class="pp">*</span>.csv <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span><span class="va">)</span><span class="st">&quot;</span>      <span class="co"># first: what the running build says it is (old build: mapping,...clamp_above_us=1200)</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> openocd <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="dt">\</span></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-c</span> <span class="st">&quot;init; halt; dump_image </span><span class="va">$HOME</span><span class="st">/VCB_flash_</span><span class="va">$(</span><span class="fu">date</span> +%Y%m%d_%H%M%S<span class="va">)</span><span class="st">.bin 0x08000000 0x100000; resume; exit&quot;</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chown boat:boat ~/VCB_flash_<span class="pp">*</span>.bin</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">#   (udev rule for the STLINK is installed; before it was, this needed sudo and a chown afterwards)</span></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: STM32_Programmer_CLI -c port=SWD mode=hotplug -u 0x08000000 0x100000 ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin</span></span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu">cmp</span> <span class="at">-l</span> ~/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span>   <span class="co"># 0 = same build as August</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> ~/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin firmware/ <span class="kw">&amp;&amp;</span> <span class="fu">git</span> add firmware/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin                   <span class="co"># keep it; commit with the results</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.2  flash the committed binary (J); it is in the checkout, no copying needed</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="fu">sha256sum</span> firmware/VCB-pixhawk-0.3.1.bin           <span class="co"># 5cde2afaa82b94a7a8ddbb0515eed363c2a4f1c200fdaea2b164953e0a0f82b5</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> openocd <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;program firmware/VCB-pixhawk-0.3.1.bin 0x08000000 verify reset exit&quot;</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.1.bin 0x08000000 -v -rst</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   (sudo until the STLINK udev rule below is in; the VCP /dev/vcb already has one)</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.1; ...</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="fu">sha256sum</span> firmware/VCB-pixhawk-0.3.2.bin           <span class="co"># 9bb6c56c40c25aeb7549df6619035518c5c62ffedaf4c457380190989496883d</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;program firmware/VCB-pixhawk-0.3.2.bin 0x08000000 verify reset exit&quot;</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.2.bin 0x08000000 -v -rst</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   (no sudo needed since the STLINK udev rule below went in on 2026-10-25)</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.2; ...</span></span>
 <span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   once only, so openocd works as boat from then on:</span></span>
 <span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="co">#   echo &#39;SUBSYSTEM==&quot;usb&quot;, ATTR{idVendor}==&quot;0483&quot;, ATTR{idProduct}==&quot;3754&quot;, MODE=&quot;0666&quot;&#39; | sudo tee /etc/udev/rules.d/60-stlink.rules</span></span>
 <span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co">#   sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</span></span>
@@ -312,15 +313,20 @@ dead-bus checks</h2>
 <h2
 id="stage-1-safety-contactors-open-pixhawk-unplugged-from-cont">Stage 1:
 safety, contactors open (Pixhawk unplugged from CONT)</h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.1-1.3  physical: E-stop x3, TSMS x3, battery disconnect. Watch window 2:</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">#          status.estop_24v_present / tsms_24v_present / bus_mv ; meter on the coil feed</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.4-1.5  E-stop pressed (then TSMS pulled), plug the Pixhawk in at neutral:</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#          window 1: ARMED -&gt; THRUSTER STARTUP_LSC ... -&gt; FAULT 3 ... x3 -&gt; FAULT latched. Then unplug, reset:</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;init; reset run; exit&quot;</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.6  software stop / clear</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> stop                      <span class="co"># FAULT 9 ..., FAULT latched: stop command</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> clear                     <span class="co"># CLEAR: stop un-latched ...</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.7  by inspection: what loses power on E-stop (converter? motors? coils only?) -&gt; checklist</span></span></code></pre></div>
+<p>Kill chain as built: TSMS switch = contactor coils; per-motor HV
+disconnects downstream of the contactors (the VCB cannot see them); pack
+main disconnect. The VCB's E-stop sense is not wired.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.1  TSMS off/on x3: window 2 status.tsms_24v_present follows (0 off, 1 on); meter on the coil feed</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.2  each motor disconnect open/closed x3: meter on that motor&#39;s HV feed; note which disconnect is which motor</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.3  pack main disconnect off: bus dead at the contactor input (meter), BMS reader agrees</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.4  TSMS off, plug the Pixhawk in at neutral (DONE 2026-10-25):</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#      window 1: ARMED -&gt; THRUSTER STARTUP_LSC ... -&gt; FAULT 3 ... x3 -&gt; FAULT latched. Then unplug, reset:</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;init; reset run; exit&quot;</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.5  status.estop_24v_present reads 1 whatever you do: nothing is wired to it (2026-10-25)</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.6  software stop / clear</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> stop                      <span class="co"># FAULT 9 ..., FAULT latched: stop command</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> clear                     <span class="co"># CLEAR: stop un-latched ...</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 1.7  what each kill reaches: TSMS -&gt; contactors (whole bus); motor disconnect -&gt; that motor only; pack -&gt; all HV</span></span></code></pre></div>
 <h2 id="stage-2-vcb-arm-start-up-disarm-zero-throttle-pack-on">Stage 2:
 VCB arm, start-up, disarm, zero throttle (pack on)</h2>
 <p>Power-up order: Pixhawk (disarmed, outputs 1500) → TSMS in, E-stop
@@ -328,25 +334,31 @@ released → VCB power.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.1  hands off; window 1: ARMED ... STARTUP_LSC ... STARTUP_WAIT ... STARTUP_HSC ... RUN ; window 2: state 5, cmd 0/0</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.2  meter at the contactor output vs status.bus_mv (within 1 V)</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.3  10 min in RUN, fault_code stays 0</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.4  E-stop in RUN -&gt; FAULT 8, lsc/hsc_closed 0, &quot;FAULT latched&quot;. Release: must stay open. Reset:</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;init; reset run; exit&quot;</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.5  same with TSMS</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.6  pull CONT in RUN -&gt; FAULT 1 within 100 ms ; plug back -&gt; &quot;FAULT cleared&quot; (3 s) -&gt; ARMED (1 s) -&gt; RUN</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.7  reboot the Pixhawk in RUN (QGC: Reboot Vehicle) -&gt; FAULT 1 -&gt; recovery</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.8  arm the Pixhawk in Manual and nudge throttle during the 1.5 s start-up -&gt; &quot;DISARMED: throttle left neutral before RUN&quot;</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.9  software stop with the bus live, then recovery</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> stop                      <span class="co"># FAULT 9, contactors open</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> clear                     <span class="co"># then 3 s neutral -&gt; FAULT cleared -&gt; ARMED -&gt; RUN</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.10 pack disconnected, VCB reset -&gt; FAULT 6 x3 -&gt; FAULT latched; precharge resistor cool</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.11 bench-mode arm/disarm with nothing turning (Pixhawk unplugged from CONT)</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 0 <span class="at">--seconds</span> 5</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="co">#      window 1: BENCH: on ... ARMED ... RUN ... DISARMED: bench off ... back to IDLE ... BENCH: off</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 0 <span class="at">--seconds</span> 30     <span class="co"># then Ctrl-C mid-way: same clean exit</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.12 three power cycles, RUN each time</span></span></code></pre></div>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.4  TSMS off in RUN (zero run below, then flip the switch) -&gt; FAULT 8, lsc/hsc_closed 0, &quot;FAULT latched&quot;.</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">#      TSMS back on: contactors must stay open. Reset:</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 0 <span class="at">--seconds</span> 60</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="ex">openocd</span> <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;init; reset run; exit&quot;</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.5  open one motor disconnect at zero thrust in RUN: the VCB stays RUN (it cannot see it)</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.6  pull CONT in RUN -&gt; FAULT 1 within 100 ms ; plug back -&gt; &quot;FAULT cleared&quot; (3 s) -&gt; ARMED (1 s) -&gt; RUN</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.7  reboot the Pixhawk in RUN (QGC: Reboot Vehicle) -&gt; FAULT 1 -&gt; recovery</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.8  arm the Pixhawk in Manual and nudge throttle during the 1.5 s start-up -&gt; &quot;DISARMED: throttle left neutral before RUN&quot;</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.9  software stop with the bus live, then recovery</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> stop                      <span class="co"># FAULT 9, contactors open</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> clear                     <span class="co"># then 3 s neutral -&gt; FAULT cleared -&gt; ARMED -&gt; RUN</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.10 pack disconnected, VCB reset -&gt; FAULT 6 x3 -&gt; FAULT latched; precharge resistor cool</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.11 bench-mode arm/disarm with nothing turning (Pixhawk unplugged from CONT)</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 0 <span class="at">--seconds</span> 5</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co">#      window 1: BENCH: on ... ARMED ... RUN ... DISARMED: bench off ... back to IDLE ... BENCH: off</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 0 <span class="at">--seconds</span> 30     <span class="co"># then Ctrl-C mid-way: same clean exit</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="co"># 2.12 three power cycles, RUN each time</span></span></code></pre></div>
 <h2 id="stage-3-jetson-drives-the-motors-at-5--props-off">Stage 3:
 Jetson drives the motors at 5 %, props off</h2>
-<p>Pixhawk unplugged from CONT or left in: bench mode ignores the PWM
-inputs. 50 permille = 5 % = byte ±6.</p>
+<p>Pixhawk unplugged from CONT. 50 permille = 5 % = byte ±6; 100 = 10 %
+= byte ±13 (the bench cap). The tool holds zero in RUN for 8 s before
+the ramp (<code>--warmup</code>, default 8): the motor controllers only
+get HV when the contactors close and need that long to boot
+(2026-10-25). Close motor disconnects only while the contactors are open
+(VCB in IDLE). 3.1, 3.2, 3.4 done 2026-10-25.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.1  right forward: which motor, which way?</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 50 <span class="at">--left</span> 0 <span class="at">--seconds</span> 5</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.2  left forward</span></span>
@@ -366,13 +378,15 @@ inputs. 50 permille = 5 % = byte ±6.</p>
 <span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 50 <span class="at">--left</span> 0 <span class="at">--seconds</span> 30</span>
 <span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="bu">kill</span> <span class="at">-9</span> <span class="va">$(</span><span class="ex">pgrep</span> <span class="at">-f</span> vcb_bench_drive.py<span class="va">)</span>       <span class="co"># &lt;= 500 ms later: FAULT 1 &quot;bench command lost&quot;, motor stops</span></span>
 <span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> bench off                                <span class="co"># tidy up; the VCB recovers to IDLE on its own after 3 s of neutral</span></span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.8  E-stop during a run -&gt; FAULT 8, motor stops. Note what actually stopped it. Reset the VCB afterwards.</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.8  open that motor&#39;s HV disconnect during a run: motor stops at once, VCB stays RUN (cannot see it)</span></span>
 <span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.9  software stop during a run (second shell)</span></span>
 <span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> stop                                     <span class="co"># FAULT 9, motor stops</span></span>
 <span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> clear</span>
 <span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.10 direct reversal through the 200 ms zero hold (cmd 6 -&gt; 0 -&gt; -6), each side</span></span>
 <span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 50 <span class="at">--left</span> 0 <span class="at">--seconds</span> 3 <span class="at">--flip</span></span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 50 <span class="at">--seconds</span> 3 <span class="at">--flip</span></span></code></pre></div>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 0 <span class="at">--left</span> 50 <span class="at">--seconds</span> 3 <span class="at">--flip</span></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.11 5 % with the warm-up: full 10 s, or is 5 % under the motor&#39;s floor?</span></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_drive.py <span class="at">--right</span> 50 <span class="at">--left</span> 0 <span class="at">--seconds</span> 10</span></code></pre></div>
 <p>If 3.1 shows the wrong motor or the wrong direction: it is fixed in
 <code>firmware/VCB-pixhawk/Core/Src/eprop.cpp</code> (addresses or the
 direction byte), rebuilt and re-flashed with the stage 0 commands, then
@@ -383,7 +397,11 @@ id="stage-4-pixhawk-motor-test-props-off-pixhawk-on-cont-vcb-bench-off">Stage
 <code>vcb bench off</code>)</h2>
 <p><code>--live</code> requires the VCB in RUN with no fault and asks
 for a typed confirmation; it prints measured µs, raw/applied permille
-and <code>cmd</code> for each step.</p>
+and <code>cmd</code> for each step. Pre-arm blockers found 2026-10-25:
+<code>Compass not calibrated</code>, <code>Battery 1 unhealthy</code>.
+For the bench only:
+<code>printf 'ARMING_SKIPCHK,260\n' &gt; /tmp/skip.parm &amp;&amp; python3 tools/ap_apply.py /tmp/skip.parm</code>
+(clear after).</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.1  right forward (AUX1 -&gt; ch1 -&gt; right motor?)</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--live</span> <span class="at">--side</span> right <span class="at">--pwm</span> 1550 <span class="at">--hold</span> 2        <span class="co"># cmd 7</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.2  left forward, then each in reverse</span></span>

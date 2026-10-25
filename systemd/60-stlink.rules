@@ -1,0 +1,4 @@
+# STLINK-V3 on the VCB: let the `boat` user drive its SWD/debug USB interface with openocd
+# (flash, reset, dump) without sudo. The VCP side (/dev/vcb) has its own rule (99-vcb.rules).
+# deploy/install.sh copies every systemd/*.rules into /etc/udev/rules.d/.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="3754", MODE="0666"
