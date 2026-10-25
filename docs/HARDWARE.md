@@ -130,8 +130,9 @@ defaults to 115200, unverified. The same probe gives SWD access for reading/flas
 ### C. `firmware/VCB-pixhawk/` (0.3.1, 2026-10-25) — rebuilt from the GitHub source, PWM in, reversible **[src]**
 First flashed 2026-10-25 (0.3.0): console confirmed on UART4/115200 both ways; its PWM capture
 did not qualify because the CONT lines carry sub-µs glitches (~200/s, both lines at once), which
-0.3.1 filters (8 µs) and discards. The board was running the later "tolerant" build before
-(993 µs read as valid), not the August dump. Bench results pending. The deployed build's source is lost, so this is cttdev's CRSF
+0.3.1 filters (8 µs) and discards: flashed the same day, both channels qualify (993 µs /
+20067 µs, `bad` 0, glitch counters 0). The board was running the later "tolerant" build before
+(993 µs read as valid), not the August dump. Arming/contactor/motor stages pending. The deployed build's source is lost, so this is cttdev's CRSF
 version with the RC input replaced by TIM2/TIM5 input capture on the same two pins (PA3 = ch1
 right, PA2 = ch2 left), a bidirectional contract (1500 µs stop, 2000 forward, 1000 reverse,
 clamped to ±20 % by default), the unchanged contactor sequence, fault recovery after a neutral

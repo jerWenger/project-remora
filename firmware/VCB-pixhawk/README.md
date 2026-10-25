@@ -8,9 +8,11 @@ proved the console both ways (banner, headers, `help`), but its PWM capture neve
 qualified: sub-microsecond glitches on both CONT lines, about every 5 ms, were captured as
 rise-and-fall at the same tick and counted as bad pulses. 0.3.1 fixes that (8 us hardware
 input filter, rising edge on CH3 and falling on CH4 as in the deployed build, glitch pairs
-discarded without touching the period, `chN_glitch` counters in the telemetry); the capture
-logic was simulated on the host with the boat's glitch pattern, but 0.3.1 itself has not
-run on the board yet.** Read "Before flashing" and "Bench test plan" below.
+discarded without touching the period, `chN_glitch` counters in the telemetry). 0.3.1 was
+flashed the same day: both channels qualify (993 us / 20067 us, `bad` 0, glitch counters 0,
+so the filter alone removes the glitches). Arming, contactors and motors not yet tested;
+commissioning continues in `docs/VCB_COMMISSIONING.md`.** Read "Before flashing" and
+"Bench test plan" below.
 
 ## Where it comes from
 
