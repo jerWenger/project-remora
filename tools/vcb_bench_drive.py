@@ -62,16 +62,24 @@ class Vcb:
         return v.get("status") or {}, v.get("pwm") or {}, v.get("last_event")
 
     def wait_for(self, pred, timeout, keepalive=None, label=""):
-        """Poll until pred(status, pwm) or timeout; send keepalive at 10 Hz meanwhile."""
-        end, last_print = time.time() + timeout, None
+        """Poll until pred(status, pwm) or timeout; send keepalive at 10 Hz meanwhile.
+        A fault already present when the wait starts is tolerated: the firmware accepts
+        'bench on' in FAULT and the zero stream recovers it after FAULT_RECOVER_HOLD_MS.
+        A fault that appears after the VCB has been seen out of FAULT aborts; a latched
+        fault (the VCB says so on the console) aborts at once."""
+        end, last_print, seen_out_of_fault = time.time() + timeout, None, False
         while time.time() < end:
             if keepalive is not None:
                 self.send(keepalive)
             st, pw, ev = self.state()
             if st is None:
                 return None, ev
-            if st.get("fault_code"):
+            if st.get("thruster_state") != FAULT:
+                seen_out_of_fault = True
+            elif seen_out_of_fault:
                 return None, "fault %s (%s)" % (st.get("fault_code"), ev)
+            elif ev and "FAULT latched" in ev:
+                return None, "VCB latched in fault %s: reset it (openocd ... 'init; reset run; exit')" % st.get("fault_code")
             key = (st.get("thruster_state"), st.get("armed"), st.get("cmd_source"))
             if key != last_print:
                 print("  %s state=%s armed=%s source=%s bus=%.1fV  %s" % (
