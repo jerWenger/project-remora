@@ -35,7 +35,7 @@ pre { font: 7.4pt/1.28 Menlo, Monaco, monospace; white-space: pre-wrap; border: 
 </style></head><body>
 
 <h1>HighFieldBoat VCB commissioning checklist</h1>
-<p class="sub">Plan: <code>docs/VCB_COMMISSIONING.md</code> &middot; commands: <code>docs/VCB_COMMISSIONING_CHEATSHEET.md</code> (also the appendix here) &middot; firmware <code>firmware/VCB-pixhawk</code> 0.3.0 &middot; printed 2026-10-20</p>
+<p class="sub">Plan: <code>docs/VCB_COMMISSIONING.md</code> &middot; commands: <code>docs/VCB_COMMISSIONING_CHEATSHEET.md</code> (also the appendix here) &middot; firmware <code>firmware/VCB-pixhawk</code> 0.3.1 &middot; printed 2026-10-20</p>
 
 <div class="fields">
 Firmware version flashed <span class="f"></span> Flash dump of the old build <span class="f" style="min-width:220px"></span><br>
@@ -79,7 +79,7 @@ Fault codes: 1 command lost &middot; 2&ndash;7 contactor/bus interlock &middot; 
 <div class="fields">Date <span class="f"></span> Operator <span class="f"></span> Old-build dump file <span class="f" style="min-width:200px"></span></div>
 <table class="steps"><colgroup><col style="width:16px"><col style="width:30px"><col style="width:30%"><col style="width:35%"><col style="width:72px"><col></colgroup><thead><tr><th></th><th>#</th><th>Do</th><th>Expect</th><th>P / F</th><th>Values / notes</th></tr></thead><tbody>
 <tr><td class="c"><span class="cb"></span></td><td class="n">0.1</td><td>Fresh flash dump; <code>cmp</code> against the August dump</td><td>Dump saved next to the August one; byte diff count recorded (0 = same build runs today)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes">diff bytes: </td></tr>
-<tr><td class="c"><span class="cb"></span></td><td class="n">0.2</td><td>Flash 0.3.0</td><td>Console banner <code>VCB pixhawk-pwm reversible 0.3.0</code>. If silent: try other bauds (UART4/115200 was inferred)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
+<tr><td class="c"><span class="cb"></span></td><td class="n">0.2</td><td>Flash 0.3.1</td><td>Console banner <code>VCB pixhawk-pwm reversible 0.3.1</code>. If silent: try other bauds (UART4/115200 was inferred)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">0.3</td><td><code>vcb help</code></td><td>Command list comes back (console input works)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">0.4</td><td>Apply <code>params/vcb-pixhawk.parm</code> (only after 0.2)</td><td>SERVO9/10 = 1380 / 1500 / 1620 verified by <code>ap_apply.py</code></td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
 <tr><td class="c"><span class="cb"></span></td><td class="n">0.5</td><td>Safety switch off / <code>BRD_SAFETY_DEFLT=0</code>, reboot Pixhawk</td><td>PWM present on AUX1/AUX2 when disarmed (1500 &micro;s)</td><td class="pf"><span class="cb"></span>P <span class="cb"></span>F</td><td class="notes"></td></tr>
@@ -266,43 +266,49 @@ fault 8, or <code>vcb clear</code> for fault 9):</p>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># or: STM32_Programmer_CLI -c port=SWD -rst</span></span></code></pre></div>
 <h2 id="stage-0-firmware-and-dead-bus-checks">Stage 0: firmware and
 dead-bus checks</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.1  dump what is on the board today (J), compare with the August dump (M)</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">STM32_Programmer_CLI</span> <span class="at">-c</span> port=SWD <span class="at">-u</span> 0x08000000 0x100000 ~/VCB_flash_<span class="va">$(</span><span class="fu">date</span> +%Y%m%d_%H%M%S<span class="va">)</span>.bin</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#         -c &quot;init; reset halt; dump_image ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; exit&quot;</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># (M)</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="fu">scp</span> <span class="st">&#39;boat@highfieldboat.tailcacf9.ts.net:~/VCB_flash_*.bin&#39;</span> firmware/</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="fu">cmp</span> <span class="at">-l</span> firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin firmware/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span>   <span class="co"># 0 = same build</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.2  flash the committed binary (J); it is in the checkout, no copying needed</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="fu">sha256sum</span> firmware/VCB-pixhawk-0.3.0.bin           <span class="co"># 292afb0c141eb9d8944c5829dd69696ebb1e427d0f4c77257590190a6f20b77d</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="ex">STM32_Programmer_CLI</span> <span class="at">-c</span> port=SWD <span class="at">-w</span> firmware/VCB-pixhawk-0.3.0.bin 0x08000000 <span class="at">-v</span> <span class="at">-rst</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c &quot;program firmware/VCB-pixhawk-0.3.0.bin 0x08000000 verify reset exit&quot;</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.0; ...</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   to go back:          STM32_Programmer_CLI -c port=SWD -w ~/VCB_flash_&lt;new&gt;.bin 0x08000000 -v -rst</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   to rebuild after a config change (M): cd ~/moos/2.733/firmware/VCB-pixhawk &amp;&amp; make TOOLCHAIN=$TC/bin/</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">#     (TC = Arm GNU Toolchain 14.2 darwin-arm64 dir), cp build/VCB-pixhawk.bin ../VCB-pixhawk-&lt;ver&gt;.bin, commit, push, update.sh</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co">#     or on the Jetson: sudo apt install gcc-arm-none-eabi &amp;&amp; make   (then flash build/VCB-pixhawk.bin)</span></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.3  console input works</span></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> help                      <span class="co"># window 1: CONSOLE: bench on | bench off | bench R L ... | stop | clear | help</span></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.4  Pixhawk params for this build (only AFTER 0.2)</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/ap_apply.py params/vcb-pixhawk.parm <span class="at">--dry-run</span></span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/ap_apply.py params/vcb-pixhawk.parm</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.5  safety switch off, otherwise there is no PWM at all (reboot the Pixhawk after)</span></span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;BRD_SAFETY_DEFLT,0\n&#39;</span> <span class="op">&gt;</span> /tmp/safety.parm <span class="kw">&amp;&amp;</span> <span class="ex">python3</span> tools/ap_apply.py /tmp/safety.parm</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.6  dead-bus contract (pack disconnected; the VCB will sit in FAULT 3/6 latched, that is fine)</span></span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 1500,1550,1600,1620,1700,1450,1400,1380,1300,1000,2000</span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect raw 0,52,157,200,368,-52,-157,-200,-368,-1000,1000; applied clamps at +-200; LEFT-&gt;ch2, RIGHT-&gt;ch1</span></span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 990,1000,1010,1990,2000,2010</span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect raw -1000,-1000,-978,978,1000,1000; all valid=1; bad not counting</span></span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 2250,2300,2350,650 <span class="at">--hold</span> 3      <span class="co"># only if ArduPilot accepts them</span></span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect 2250/2300 valid raw 1000; 2350/650 bad counts, valid 0 after 100 ms</span></span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.7  timebase: in the 1500 step above, ch1_us/ch2_us must read 1485..1515</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.1  dump what is on the board today (J) without resetting it, compare with the August dump</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co">#      (mode=hotplug / halt+resume: the VCB keeps running; the August dump is in the checkout)</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-3</span> <span class="st">&quot;</span><span class="va">$(</span><span class="fu">ls</span> <span class="at">-t</span> ~/vcblogs/<span class="pp">*</span>.csv <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span><span class="va">)</span><span class="st">&quot;</span>      <span class="co"># first: what the running build says it is (old build: mapping,...clamp_above_us=1200)</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> openocd <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="dt">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-c</span> <span class="st">&quot;init; halt; dump_image </span><span class="va">$HOME</span><span class="st">/VCB_flash_</span><span class="va">$(</span><span class="fu">date</span> +%Y%m%d_%H%M%S<span class="va">)</span><span class="st">.bin 0x08000000 0x100000; resume; exit&quot;</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chown boat:boat ~/VCB_flash_<span class="pp">*</span>.bin</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: STM32_Programmer_CLI -c port=SWD mode=hotplug -u 0x08000000 0x100000 ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu">cmp</span> <span class="at">-l</span> ~/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span>   <span class="co"># 0 = same build as August</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> ~/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin firmware/ <span class="kw">&amp;&amp;</span> <span class="fu">git</span> add firmware/VCB_flash_<span class="op">&lt;</span>new<span class="op">&gt;</span>.bin                   <span class="co"># keep it; commit with the results</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.2  flash the committed binary (J); it is in the checkout, no copying needed</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="fu">sha256sum</span> firmware/VCB-pixhawk-0.3.1.bin           <span class="co"># 5cde2afaa82b94a7a8ddbb0515eed363c2a4f1c200fdaea2b164953e0a0f82b5</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> openocd <span class="at">-f</span> interface/stlink.cfg <span class="at">-f</span> target/stm32h7x.cfg <span class="at">-c</span> <span class="st">&quot;program firmware/VCB-pixhawk-0.3.1.bin 0x08000000 verify reset exit&quot;</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.1.bin 0x08000000 -v -rst</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   (sudo until the STLINK udev rule below is in; the VCP /dev/vcb already has one)</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.1; ...</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   once only, so openocd works as boat from then on:</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="co">#   echo &#39;SUBSYSTEM==&quot;usb&quot;, ATTR{idVendor}==&quot;0483&quot;, ATTR{idProduct}==&quot;3754&quot;, MODE=&quot;0666&quot;&#39; | sudo tee /etc/udev/rules.d/60-stlink.rules</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co">#   sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co">#   to go back:          STM32_Programmer_CLI -c port=SWD -w ~/VCB_flash_&lt;new&gt;.bin 0x08000000 -v -rst</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="co">#   to rebuild after a config change (M): cd ~/moos/2.733/firmware/VCB-pixhawk &amp;&amp; make TOOLCHAIN=$TC/bin/</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="co">#     (TC = Arm GNU Toolchain 14.2 darwin-arm64 dir), cp build/VCB-pixhawk.bin ../VCB-pixhawk-&lt;ver&gt;.bin, commit, push, update.sh</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="co">#     or on the Jetson: sudo apt install gcc-arm-none-eabi &amp;&amp; make   (then flash build/VCB-pixhawk.bin)</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.3  console input works</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="ex">vcb</span> help                      <span class="co"># window 1: CONSOLE: bench on | bench off | bench R L ... | stop | clear | help</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.4  Pixhawk params for this build (only AFTER 0.2)</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/ap_apply.py params/vcb-pixhawk.parm <span class="at">--dry-run</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/ap_apply.py params/vcb-pixhawk.parm</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.5  safety switch off, otherwise there is no PWM at all (reboot the Pixhawk after)</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;BRD_SAFETY_DEFLT,0\n&#39;</span> <span class="op">&gt;</span> /tmp/safety.parm <span class="kw">&amp;&amp;</span> <span class="ex">python3</span> tools/ap_apply.py /tmp/safety.parm</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.6  dead-bus contract (pack disconnected; the VCB will sit in FAULT 3/6 latched, that is fine)</span></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 1500,1550,1600,1620,1700,1450,1400,1380,1300,1000,2000</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect raw 0,52,157,200,368,-52,-157,-200,-368,-1000,1000; applied clamps at +-200; LEFT-&gt;ch2, RIGHT-&gt;ch1</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 990,1000,1010,1990,2000,2010</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect raw -1000,-1000,-978,978,1000,1000; all valid=1; bad not counting</span></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/vcb_bench_check.py <span class="at">--pwm</span> 2250,2300,2350,650 <span class="at">--hold</span> 3      <span class="co"># only if ArduPilot accepts them</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="co">#   expect 2250/2300 valid raw 1000; 2350/650 bad counts, valid 0 after 100 ms</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="co"># 0.7  timebase: in the 1500 step above, ch1_us/ch2_us must read 1485..1515</span></span></code></pre></div>
 <h2
 id="stage-1-safety-contactors-open-pixhawk-unplugged-from-cont">Stage 1:
 safety, contactors open (Pixhawk unplugged from CONT)</h2>
@@ -399,9 +405,10 @@ and <code>cmd</code> for each step.</p>
 <span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.7  (optional) is the hold needed? build without it, re-flash (stage 0.2), repeat 4.6, then put it back</span></span>
 <span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="fu">sed</span> <span class="at">-i</span> <span class="st">&#39;&#39;</span> <span class="st">&#39;s/^#define DIRECTION_CHANGE_STOP_MS .*/#define DIRECTION_CHANGE_STOP_MS     0/&#39;</span> Core/Inc/config.h      <span class="co"># (M)</span></span>
 <span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="fu">sed</span> <span class="at">-i</span> <span class="st">&#39;&#39;</span> <span class="st">&#39;s/^#define DIRECTION_CHANGE_STOP_MS .*/#define DIRECTION_CHANGE_STOP_MS     200/&#39;</span> Core/Inc/config.h    <span class="co"># (M) revert</span></span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.8  scale: at 1620 us the converter sees 25. If the motor behaves like 25 %, full scale is 100:</span></span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="fu">sed</span> <span class="at">-i</span> <span class="st">&#39;&#39;</span> <span class="st">&#39;s/^#define EPROP_FULL_SCALE_VALUE .*/#define EPROP_FULL_SCALE_VALUE       100/&#39;</span> Core/Inc/config.h      <span class="co"># (M), rebuild, re-flash</span></span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.9  QGC: disarm while the VCB is in RUN -&gt; outputs 1500, VCB stays RUN with cmd 0. Decide and write it down.</span></span></code></pre></div>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="co">#      (watch window 2: chN_glitch counts the discarded glitch pairs; chN_bad must stay 0 on a clean signal)</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.8  scale: at 1620 us the converter sees 25. If the motor behaves like 25 %, full scale is 100:</span></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="fu">sed</span> <span class="at">-i</span> <span class="st">&#39;&#39;</span> <span class="st">&#39;s/^#define EPROP_FULL_SCALE_VALUE .*/#define EPROP_FULL_SCALE_VALUE       100/&#39;</span> Core/Inc/config.h      <span class="co"># (M), rebuild, re-flash</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.9  QGC: disarm while the VCB is in RUN -&gt; outputs 1500, VCB stays RUN with cmd 0. Decide and write it down.</span></span></code></pre></div>
 <h2 id="stage-5-rc-props-off-receiver-installed">Stage 5: RC, props off
 (receiver installed)</h2>
 <div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> tools/ap_inventory.py <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-i</span> <span class="at">-E</span> <span class="st">&quot;rc|receiver&quot;</span>            <span class="co"># receiver bound?</span></span>

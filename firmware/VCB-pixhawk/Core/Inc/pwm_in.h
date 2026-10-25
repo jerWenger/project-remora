@@ -1,8 +1,10 @@
 /*
  * pwm_in.h - two servo-PWM inputs measured with timer input capture.
  *
- *   ch1 = PA3 (CONT connector pin 2) on TIM5: TI4 -> IC4 rising, IC3 falling
- *   ch2 = PA2 (CONT connector pin 1) on TIM2: TI3 -> IC3 rising, IC4 falling
+ *   ch1 = PA3 (CONT connector pin 2) on TIM5: TI4 -> IC3 rising (indirect), IC4 falling
+ *   ch2 = PA2 (CONT connector pin 1) on TIM2: TI3 -> IC3 rising, IC4 falling (indirect)
+ * Rising on CH3 and falling on CH4 for both, so the ISR always sees a
+ * same-tick glitch as rise-then-fall (the HAL services CC3 before CC4).
  *
  * Both timers run at 1 MHz (1 tick = 1 us), 32-bit free running. The ISR
  * measures period (rising to rising) and width (rising to falling), checks
@@ -29,6 +31,7 @@ typedef struct {
   uint32_t ok_count;      /* good pulses since boot */
   uint32_t bad_count;     /* rejected pulses since boot */
   uint32_t ovr_count;     /* capture overruns since boot */
+  uint32_t glitch_count;  /* rise+fall pairs narrower than PWM_MIN_WIDTH_US, ignored, since boot */
   uint32_t age_ms;        /* time since the last good pulse */
 } PwmInSample;
 

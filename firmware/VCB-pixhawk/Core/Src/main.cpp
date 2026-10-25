@@ -679,7 +679,7 @@ static void print_header_line(uint8_t which)
     case 1:
       printf("pwm,ms,ch1_us,ch1_period_us,ch1_valid,ch1_raw_permille,ch1_applied_permille,ch1_ok,ch1_bad,ch1_ovr,"
              "ch2_us,ch2_period_us,ch2_valid,ch2_raw_permille,ch2_applied_permille,ch2_ok,ch2_bad,ch2_ovr,"
-             "ch1_cmd,ch2_cmd\r\n");
+             "ch1_cmd,ch2_cmd,ch1_glitch,ch2_glitch\r\n");
       break;
     default:
       printf("status,ms,thruster_state,armed,estop_24v_present,tsms_24v_present,lsc_closed,hsc_closed,bus_mv,"
@@ -726,7 +726,7 @@ static void print_pwm_line(uint32_t now)
   const ChannelCmd* b = &chan[1];
   /* ch1_cmd / ch2_cmd: the signed value byte last sent to the converter for
    * that channel's motor (ch1 = right = address 2, ch2 = left = address 1). */
-  printf("pwm,%lu,%lu,%lu,%u,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%u,%ld,%ld,%lu,%lu,%lu,%d,%d\r\n",
+  printf("pwm,%lu,%lu,%lu,%u,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%u,%ld,%ld,%lu,%lu,%lu,%d,%d,%lu,%lu\r\n",
          (unsigned long)now,
          (unsigned long)a->s.width_us, (unsigned long)a->s.period_us, (unsigned)a->s.valid,
          (long)a->raw_permille, (long)a->applied_permille,
@@ -734,7 +734,8 @@ static void print_pwm_line(uint32_t now)
          (unsigned long)b->s.width_us, (unsigned long)b->s.period_us, (unsigned)b->s.valid,
          (long)b->raw_permille, (long)b->applied_permille,
          (unsigned long)b->s.ok_count, (unsigned long)b->s.bad_count, (unsigned long)b->s.ovr_count,
-         (int)eprop.lastCommand(EProp::RIGHT), (int)eprop.lastCommand(EProp::LEFT));
+         (int)eprop.lastCommand(EProp::RIGHT), (int)eprop.lastCommand(EProp::LEFT),
+         (unsigned long)a->s.glitch_count, (unsigned long)b->s.glitch_count);
 }
 
 static void print_status_line(uint32_t now)
@@ -1144,31 +1145,43 @@ static uint32_t PwmTimer_Prescaler(void)
   return (timclk / 1000000U) - 1U;   /* 128 MHz -> 127 -> 1 us per tick */
 }
 
-static void MX_TIM_IC_Common(TIM_HandleTypeDef* htim, TIM_TypeDef* instance,
-                             uint32_t rise_channel, uint32_t fall_channel)
+/* Both timers: rising edge captured on CH3, falling edge on CH4, as in the
+ * deployed build. `pin_channel` is the channel whose TIx input is the pin
+ * (TIM2: PA2 = TI3, TIM5: PA3 = TI4); the other channel takes the same TIx
+ * indirectly. The HAL services CC3 before CC4 when both are pending, so a
+ * glitch that is captured on both channels at the same tick is always seen
+ * rise-then-fall and discards itself in pwm_in.c (width 0 < PWM_MIN_WIDTH_US). */
+static void MX_TIM_IC_Common(TIM_HandleTypeDef* htim, TIM_TypeDef* instance, uint32_t pin_channel)
 {
+  const uint32_t rise_channel = TIM_CHANNEL_3;
+  const uint32_t fall_channel = TIM_CHANNEL_4;
   TIM_IC_InitTypeDef sConfigIC = {0};
 
   htim->Instance = instance;
   htim->Init.Prescaler = PwmTimer_Prescaler();
   htim->Init.CounterMode = TIM_COUNTERMODE_UP;
   htim->Init.Period = 0xFFFFFFFFU;
-  htim->Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim->Init.ClockDivision = TIM_CLOCKDIVISION_DIV4;   /* fDTS = 32 MHz, for the input filter below */
   htim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_IC_Init(htim) != HAL_OK)
   {
     Error_Handler();
   }
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
-  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICSelection = (rise_channel == pin_channel) ? TIM_ICSELECTION_DIRECTTI : TIM_ICSELECTION_INDIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 3;   /* 8 samples at the timer clock: ~60 ns glitch filter */
+  /* Input filter: fDTS/32 sampling, 8 consecutive samples = 8 us at fDTS = 32 MHz.
+   * On the boat (2026-10-25) sub-microsecond glitches arrive on both CONT lines
+   * about every 5 ms; with a 60 ns filter each one was captured as a rise and a
+   * fall at the same tick and the measurement never qualified. A real servo
+   * edge is stable for >= 700 us, so 8 us costs nothing. */
+  sConfigIC.ICFilter = 0xF;
   if (HAL_TIM_IC_ConfigChannel(htim, &sConfigIC, rise_channel) != HAL_OK)
   {
     Error_Handler();
   }
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
-  sConfigIC.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+  sConfigIC.ICSelection = (fall_channel == pin_channel) ? TIM_ICSELECTION_DIRECTTI : TIM_ICSELECTION_INDIRECTTI;
   if (HAL_TIM_IC_ConfigChannel(htim, &sConfigIC, fall_channel) != HAL_OK)
   {
     Error_Handler();
@@ -1177,12 +1190,12 @@ static void MX_TIM_IC_Common(TIM_HandleTypeDef* htim, TIM_TypeDef* instance,
 
 static void MX_TIM2_Init(void)
 {
-  MX_TIM_IC_Common(&htim2, TIM2, TIM_CHANNEL_3, TIM_CHANNEL_4);
+  MX_TIM_IC_Common(&htim2, TIM2, TIM_CHANNEL_3);   /* PA2 = TIM2_CH3 = TI3 */
 }
 
 static void MX_TIM5_Init(void)
 {
-  MX_TIM_IC_Common(&htim5, TIM5, TIM_CHANNEL_4, TIM_CHANNEL_3);
+  MX_TIM_IC_Common(&htim5, TIM5, TIM_CHANNEL_4);   /* PA3 = TIM5_CH4 = TI4 */
 }
 
 /**

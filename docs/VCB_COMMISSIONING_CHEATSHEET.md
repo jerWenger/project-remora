@@ -43,19 +43,25 @@ openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; reset run; exit
 ## Stage 0: firmware and dead-bus checks
 
 ```sh
-# 0.1  dump what is on the board today (J), compare with the August dump (M)
-STM32_Programmer_CLI -c port=SWD -u 0x08000000 0x100000 ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin
-#   or: openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
-#         -c "init; reset halt; dump_image ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; exit"
-# (M)
-scp 'boat@highfieldboat.tailcacf9.ts.net:~/VCB_flash_*.bin' firmware/
-cmp -l firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin firmware/VCB_flash_<new>.bin | wc -l   # 0 = same build
+# 0.1  dump what is on the board today (J) without resetting it, compare with the August dump
+#      (mode=hotplug / halt+resume: the VCB keeps running; the August dump is in the checkout)
+tail -3 "$(ls -t ~/vcblogs/*.csv | head -1)"      # first: what the running build says it is (old build: mapping,...clamp_above_us=1200)
+sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
+  -c "init; halt; dump_image $HOME/VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; resume; exit"
+sudo chown boat:boat ~/VCB_flash_*.bin
+#   or: STM32_Programmer_CLI -c port=SWD mode=hotplug -u 0x08000000 0x100000 ~/VCB_flash_$(date +%Y%m%d_%H%M%S).bin
+cmp -l ~/VCB_flash_<new>.bin firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin | wc -l   # 0 = same build as August
+cp ~/VCB_flash_<new>.bin firmware/ && git add firmware/VCB_flash_<new>.bin                   # keep it; commit with the results
 
 # 0.2  flash the committed binary (J); it is in the checkout, no copying needed
-sha256sum firmware/VCB-pixhawk-0.3.0.bin           # 292afb0c141eb9d8944c5829dd69696ebb1e427d0f4c77257590190a6f20b77d
-STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.0.bin 0x08000000 -v -rst
-#   or: openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.0.bin 0x08000000 verify reset exit"
-#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.0; ...
+sha256sum firmware/VCB-pixhawk-0.3.1.bin           # 5cde2afaa82b94a7a8ddbb0515eed363c2a4f1c200fdaea2b164953e0a0f82b5
+sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.1.bin 0x08000000 verify reset exit"
+#   or: STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.1.bin 0x08000000 -v -rst
+#   (sudo until the STLINK udev rule below is in; the VCP /dev/vcb already has one)
+#   window 1 must show:  VCB pixhawk-pwm reversible 0.3.1; ...
+#   once only, so openocd works as boat from then on:
+#   echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="3754", MODE="0666"' | sudo tee /etc/udev/rules.d/60-stlink.rules
+#   sudo udevadm control --reload && sudo udevadm trigger
 #   to go back:          STM32_Programmer_CLI -c port=SWD -w ~/VCB_flash_<new>.bin 0x08000000 -v -rst
 #   to rebuild after a config change (M): cd ~/moos/2.733/firmware/VCB-pixhawk && make TOOLCHAIN=$TC/bin/
 #     (TC = Arm GNU Toolchain 14.2 darwin-arm64 dir), cp build/VCB-pixhawk.bin ../VCB-pixhawk-<ver>.bin, commit, push, update.sh
@@ -184,6 +190,7 @@ python3 tools/vcb_bench_check.py --live --side left  --pwm 1620,1380 --hold 3
 # 4.7  (optional) is the hold needed? build without it, re-flash (stage 0.2), repeat 4.6, then put it back
 sed -i '' 's/^#define DIRECTION_CHANGE_STOP_MS .*/#define DIRECTION_CHANGE_STOP_MS     0/' Core/Inc/config.h      # (M)
 sed -i '' 's/^#define DIRECTION_CHANGE_STOP_MS .*/#define DIRECTION_CHANGE_STOP_MS     200/' Core/Inc/config.h    # (M) revert
+#      (watch window 2: chN_glitch counts the discarded glitch pairs; chN_bad must stay 0 on a clean signal)
 # 4.8  scale: at 1620 us the converter sees 25. If the motor behaves like 25 %, full scale is 100:
 sed -i '' 's/^#define EPROP_FULL_SCALE_VALUE .*/#define EPROP_FULL_SCALE_VALUE       100/' Core/Inc/config.h      # (M), rebuild, re-flash
 # 4.9  QGC: disarm while the VCB is in RUN -> outputs 1500, VCB stays RUN with cmd 0. Decide and write it down.

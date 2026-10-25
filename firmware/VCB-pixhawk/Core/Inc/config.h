@@ -8,7 +8,7 @@
 #define VCB_CONFIG_H
 
 #define FW_NAME     "VCB pixhawk-pwm reversible"
-#define FW_VERSION  "0.3.0"
+#define FW_VERSION  "0.3.1"
 
 /* ---- Thrust limit -------------------------------------------------------
  * Hard cap applied to the command sent to the ePropulsion converter, in both

@@ -6,6 +6,8 @@
 
 typedef struct {
   TIM_HandleTypeDef* htim;
+  /* written by the ISR only */
+  volatile uint32_t glitch_count;     /* rise+fall pairs narrower than PWM_MIN_WIDTH_US, ignored */
   uint32_t rise_channel;   /* TIM_CHANNEL_x that captures the rising edge  */
   uint32_t fall_channel;   /* TIM_CHANNEL_x that captures the falling edge */
   uint32_t rise_of_flag;   /* TIM_FLAG_CCxOF of the rising capture */
@@ -13,6 +15,8 @@ typedef struct {
 
   /* written by the ISR only */
   volatile uint32_t rise_tick;
+  volatile uint32_t orphan_fall_tick;  /* a falling capture with no candidate pending */
+  volatile bool     have_orphan_fall;
   volatile uint32_t prev_rise_tick;
   volatile bool     have_rise;        /* a rising edge is waiting for its falling edge */
   volatile bool     have_prev_rise;   /* prev_rise_tick is meaningful */
@@ -41,18 +45,23 @@ static void channel_init(PwmChannel* c, TIM_HandleTypeDef* htim,
   c->fall_of_flag = fall_of_flag;
   c->rise_tick = c->prev_rise_tick = 0;
   c->have_rise = c->have_prev_rise = c->have_period = false;
+  c->orphan_fall_tick = 0;
+  c->have_orphan_fall = false;
   c->width_us = c->period_us = 0;
   c->last_good_ms = c->last_edge_ms = 0;
   c->ok_count = c->bad_count = c->ovr_count = 0;
+  c->glitch_count = 0;
   c->good_streak = 0;
   c->valid = false;
 }
 
 void PwmIn_Start(TIM_HandleTypeDef* htim_ch1, TIM_HandleTypeDef* htim_ch2)
 {
-  /* ch1: PA3 = TIM5_CH4 (TI4). Direct TI4->IC4 rising, indirect TI4->IC3 falling. */
-  channel_init(&ch[0], htim_ch1, TIM_CHANNEL_4, TIM_CHANNEL_3, TIM_FLAG_CC4OF, TIM_FLAG_CC3OF);
-  /* ch2: PA2 = TIM2_CH3 (TI3). Direct TI3->IC3 rising, indirect TI3->IC4 falling. */
+  /* Both timers: CH3 captures the rising edge, CH4 the falling edge (see
+   * MX_TIM_IC_Common in main.cpp for why the order matters).
+   * ch1: PA3 = TIM5 TI4 -> IC3 (indirect) rising, IC4 (direct) falling.
+   * ch2: PA2 = TIM2 TI3 -> IC3 (direct) rising, IC4 (indirect) falling. */
+  channel_init(&ch[0], htim_ch1, TIM_CHANNEL_3, TIM_CHANNEL_4, TIM_FLAG_CC3OF, TIM_FLAG_CC4OF);
   channel_init(&ch[1], htim_ch2, TIM_CHANNEL_3, TIM_CHANNEL_4, TIM_FLAG_CC3OF, TIM_FLAG_CC4OF);
 
   for (int i = 0; i < PWM_IN_CHANNELS; i++) {
@@ -73,22 +82,28 @@ static void mark_bad(PwmChannel* c)
   c->good_streak = 0;
 }
 
+/* A rising edge only records a candidate: nothing about the previous pulse
+ * (period base, width) changes until a falling edge shows the candidate was a
+ * real pulse. Glitches (rise and fall a few ticks apart, or the same tick)
+ * are discarded whole in on_falling() and leave the period untouched. */
 static void on_rising(PwmChannel* c, uint32_t tick, uint32_t now_ms)
 {
-  if (c->have_rise) {
-    /* two rising edges without a falling edge in between: the falling
-     * capture was missed (glitch or overrun). Count it, keep going. */
-    mark_bad(c);
+  /* A rising edge while a candidate is already pending is not a bad pulse:
+   * it happens when a glitch's falling capture was serviced before its rising
+   * capture (channel order in the ISR), leaving a dangling candidate. A truly
+   * missed falling capture shows up as an overrun instead. Take the newer edge. */
+  if (c->have_orphan_fall) {
+    c->have_orphan_fall = false;
+    uint32_t d = tick - c->orphan_fall_tick;          /* either sign: the fall may carry the later tick */
+    if (d < PWM_MIN_WIDTH_US || (0u - d) < PWM_MIN_WIDTH_US) {
+      /* the other half of a glitch whose falling capture was serviced first:
+       * not a candidate (otherwise the next glitch's fall would close it into
+       * a fake pulse) */
+      c->glitch_count++;
+      c->last_edge_ms = now_ms;
+      return;
+    }
   }
-  if (c->have_prev_rise) {
-    uint32_t period = tick - c->prev_rise_tick;   /* unsigned wrap is correct */
-    c->period_us = period;
-    /* After a gap longer than any accepted period (signal was off, or we
-     * were not capturing), start over: the next pulse is not judged. */
-    c->have_period = (period <= PWM_MAX_PERIOD_US);
-  }
-  c->prev_rise_tick = tick;
-  c->have_prev_rise = true;
   c->rise_tick = tick;
   c->have_rise = true;
   c->last_edge_ms = now_ms;
@@ -98,16 +113,39 @@ static void on_falling(PwmChannel* c, uint32_t tick, uint32_t now_ms)
 {
   c->last_edge_ms = now_ms;
   if (!c->have_rise) {
-    return;   /* falling edge first (we started mid-pulse): ignore */
+    /* falling edge with no candidate: we started mid-pulse, or this is the
+     * first half of a glitch pair serviced out of order (see on_rising) */
+    c->orphan_fall_tick = tick;
+    c->have_orphan_fall = true;
+    return;
   }
   c->have_rise = false;
   uint32_t width = tick - c->rise_tick;
+
+  if (width < PWM_MIN_WIDTH_US) {
+    /* Narrower than any pulse the contract allows: a glitch. It is not a
+     * pulse, so it does not count as bad, does not become the period base,
+     * and does not touch the reported width. */
+    c->glitch_count++;
+    return;
+  }
+
+  /* A real pulse: the period is measured between accepted rising edges. */
+  if (c->have_prev_rise) {
+    uint32_t period = c->rise_tick - c->prev_rise_tick;   /* unsigned wrap is correct */
+    c->period_us = period;
+    /* After a gap longer than any accepted period (signal was off, or we
+     * were not capturing), start over: this pulse is not judged. */
+    c->have_period = (period <= PWM_MAX_PERIOD_US);
+  }
+  c->prev_rise_tick = c->rise_tick;
+  c->have_prev_rise = true;
   c->width_us = width;
 
   if (!c->have_period) {
     return;   /* first pulse after boot or after a gap: no period to judge it by, count it neither way */
   }
-  bool width_ok  = (width >= PWM_MIN_WIDTH_US) && (width <= PWM_MAX_WIDTH_US);
+  bool width_ok  = (width <= PWM_MAX_WIDTH_US);
   bool period_ok = (c->period_us >= PWM_MIN_PERIOD_US) && (c->period_us <= PWM_MAX_PERIOD_US) &&
                    (width < c->period_us);
   if (width_ok && period_ok) {
@@ -160,6 +198,7 @@ void PwmIn_Snapshot(uint8_t i, uint32_t now_ms, PwmInSample* out)
   out->ok_count  = c->ok_count;
   out->bad_count = c->bad_count;
   out->ovr_count = c->ovr_count;
+  out->glitch_count = c->glitch_count;
   bool valid = c->valid;
   uint32_t last_good = c->last_good_ms;
   uint32_t last_edge = c->last_edge_ms;

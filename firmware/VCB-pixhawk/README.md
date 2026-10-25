@@ -3,10 +3,14 @@
 Best-effort re-creation of the VCB (Vehicle Control Board, STM32H723VG) firmware
 that runs on the boat, built from the only source we have, plus reverse thrust.
 
-**Version 0.3.0 (2026-10-20). Status: compiles (Arm GNU Toolchain 14.2, no warnings),
-the mapping arithmetic and the console parser were checked on the host, the rest was
-reviewed on paper; never flashed, never bench-tested.** Read "Before flashing" and "Bench
-test plan" below. Nothing here has touched the boat.
+**Version 0.3.1 (2026-10-25). Status: 0.3.0 was flashed on the boat on 2026-10-25 and
+proved the console both ways (banner, headers, `help`), but its PWM capture never
+qualified: sub-microsecond glitches on both CONT lines, about every 5 ms, were captured as
+rise-and-fall at the same tick and counted as bad pulses. 0.3.1 fixes that (8 us hardware
+input filter, rising edge on CH3 and falling on CH4 as in the deployed build, glitch pairs
+discarded without touching the period, `chN_glitch` counters in the telemetry); the capture
+logic was simulated on the host with the boat's glitch pattern, but 0.3.1 itself has not
+run on the board yet.** Read "Before flashing" and "Bench test plan" below.
 
 ## Where it comes from
 
@@ -82,9 +86,15 @@ the telemetry (`ch1_cmd`, `ch2_cmd`), so the bench can watch it at 990, 1010, 19
 - A pulse is accepted when its width is 700..2300 us and its period 2..30 ms (33..500 Hz).
   ArduPilot's own limits are 800..2200 us, so a 2200 us output that reads 2222 us here is
   still accepted (as full forward), not rejected.
-- A channel is `valid` after 3 consecutive accepted pulses. A rejected pulse (glitch) does
-  not invalidate it; the last accepted width stays in force. It drops to invalid when no
-  accepted pulse, or no edge at all, arrives for 100 ms. Invalid means raw = applied = 0.
+- A channel is `valid` after 3 consecutive accepted pulses; the first pulse after boot or a
+  gap only establishes the period base, so that is 4 pulses, 80 ms at 50 Hz. A rejected
+  pulse does not invalidate it; the last accepted width stays in force. It drops to invalid
+  when no accepted pulse, or no edge at all, arrives for 100 ms. Invalid means raw =
+  applied = 0.
+- Glitches (a rise and a fall less than `PWM_MIN_WIDTH_US` apart) are not pulses: the timer
+  input filter removes anything under 8 us, and whatever gets through is discarded whole,
+  counted in `chN_glitch`, and leaves the width and period untouched. The boat's CONT lines
+  carry such glitches at ~200/s (2026-10-25); the deployed build evidently filtered them too.
 - `raw_permille` is the stick position (+-1000), `applied_permille` is what goes to the
   converter. The telemetry shows both, so the limit is visible on the bench.
 - The limit is a clamp, not a scale: with the default, 1600 us and 2000 us both give 20 %.
@@ -184,11 +194,11 @@ Same line kinds as the deployed build, so `scripts/vcb_logger.py`,
 `tools/vcb_bench_check.py` and the GCS page need no change:
 
 ```
-VCB pixhawk-pwm reversible 0.3.0; limit 200 permille both directions; neutral 1500 us; deadband 25 us; window 700..2300 us; dir-change stop 200 ms; console commands: help
-mapping,ch1=CONT_pin2_PA3,ch2=CONT_pin1_PA2,motors=ch1_right:ch2_left,range_us=1000:2000,neutral_us=1500,deadband_us=25,limit_permille=200,window_us=700:2300,dir_stop_ms=200,cmd_full_scale=127,fw=0.3.0
-pwm,ms,ch1_us,ch1_period_us,ch1_valid,ch1_raw_permille,ch1_applied_permille,ch1_ok,ch1_bad,ch1_ovr,ch2_us,...,ch2_ovr,ch1_cmd,ch2_cmd
+VCB pixhawk-pwm reversible 0.3.1; limit 200 permille both directions; neutral 1500 us; deadband 25 us; window 700..2300 us; dir-change stop 200 ms; console commands: help
+mapping,ch1=CONT_pin2_PA3,ch2=CONT_pin1_PA2,motors=ch1_right:ch2_left,range_us=1000:2000,neutral_us=1500,deadband_us=25,limit_permille=200,window_us=700:2300,dir_stop_ms=200,cmd_full_scale=127,fw=0.3.1
+pwm,ms,ch1_us,ch1_period_us,ch1_valid,ch1_raw_permille,ch1_applied_permille,ch1_ok,ch1_bad,ch1_ovr,ch2_us,...,ch2_ovr,ch1_cmd,ch2_cmd,ch1_glitch,ch2_glitch
 status,ms,thruster_state,armed,estop_24v_present,tsms_24v_present,lsc_closed,hsc_closed,bus_mv,fault_code,interlock_faults,cmd_source
-pwm,12345,1500,20000,1,0,0,617,0,0,1499,20001,1,0,0,617,0,0,0,0
+pwm,12345,1500,20000,1,0,0,617,0,0,1499,20001,1,0,0,617,0,0,0,0,41,40
 status,12400,1,1,1,1,0,0,1200,0,0,0
 ```
 
@@ -196,9 +206,10 @@ status,12400,1,1,1,1,0,0,1200,0,0,0
 - `raw_permille` / `applied_permille` are now signed. The GCS thrust bars show reverse as a
   negative number with an empty bar (no change made to `scripts/gcs.py`).
 - `status` has three new trailing fields, `fault_code`, `interlock_faults` and
-  `cmd_source` (0 PWM, 1 bench), and `pwm` has `ch1_cmd` and `ch2_cmd`: the signed value
-  byte last sent to the converter for that channel's motor (0 unless in RUN; 25 at the
-  default limit; the direction hold shows as 0 between + and -). In bench mode
+  `cmd_source` (0 PWM, 1 bench), and `pwm` has `ch1_cmd` and `ch2_cmd` (the signed value
+  byte last sent to the converter for that channel's motor; 0 unless in RUN; 25 at the
+  default limit; the direction hold shows as 0 between + and -) followed by `ch1_glitch`
+  and `ch2_glitch` (glitch pairs discarded since boot). In bench mode
   `raw_permille`/`applied_permille` are the bench command while `chN_us`/`chN_valid` still
   show the measured PWM. The logger picks new fields up from the header line.
 - Free-text event lines (`ARMED: ...`, `FAULT 3: ...`, `THRUSTER STARTUP_LSC: ...`) are as
@@ -266,24 +277,28 @@ binary and Homebrew's `arm-none-eabi-gcc` ships without newlib; use the Arm GNU 
 1. **Dump the current flash again** and keep it next to the August dump:
    ```
    # on the Jetson (STLINK-V3 is on the Jetson, serial 003E001C3234511037333934)
-   STM32_Programmer_CLI -c port=SWD -u 0x08000000 0x100000 VCB_flash_$(date +%Y%m%d_%H%M%S).bin
+   STM32_Programmer_CLI -c port=SWD mode=hotplug -u 0x08000000 0x100000 VCB_flash_$(date +%Y%m%d_%H%M%S).bin
    # or
    openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
-     -c "init; reset halt; dump_image VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; exit"
+     -c "init; halt; dump_image VCB_flash_$(date +%Y%m%d_%H%M%S).bin 0x08000000 0x100000; resume; exit"
+   # (hotplug / halt+resume: reads the flash without resetting the running build, which keeps
+   # printing its banner so you can also see what it calls itself)
    ```
    Diff it against `firmware/VCB_flash_20260805_211528_pre_tolerant_pwm.bin`; that
    settles open question 1 in `docs/HARDWARE.md` (which build runs today).
 2. HV bus down, both contactors open, Pixhawk outputs at the **new** neutral
    (1500 us) or unplugged. With the old params (990 us idle) this build reads 990 us as
    full reverse: valid, but never neutral, so it never arms. Safe, but confusing.
-3. Flash. The built image is committed as `firmware/VCB-pixhawk-0.3.0.bin`
-   (sha256 `292afb0c141eb9d8944c5829dd69696ebb1e427d0f4c77257590190a6f20b77d`), so the Jetson
-   checkout has it; `build/` is not committed.
+3. Flash. The built image is committed as `firmware/VCB-pixhawk-0.3.1.bin`
+   (sha256 `5cde2afaa82b94a7a8ddbb0515eed363c2a4f1c200fdaea2b164953e0a0f82b5`), so the Jetson
+   checkout has it; `build/` is not committed. (`VCB-pixhawk-0.3.0.bin` is the first image
+   that ran on the boat, kept for the record; its PWM capture does not qualify.)
    ```
-   STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.0.bin 0x08000000 -v -rst
+   sudo openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.1.bin 0x08000000 verify reset exit"
    # or
-   openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "program firmware/VCB-pixhawk-0.3.0.bin 0x08000000 verify reset exit"
+   STM32_Programmer_CLI -c port=SWD -w firmware/VCB-pixhawk-0.3.1.bin 0x08000000 -v -rst
    ```
+   (sudo, or the udev rule in the cheat sheet, for the STLINK's USB debug interface.)
 4. `cat ~/vcb.json` or `vcb_logger.py --stdout`: the first line must be the
    `VCB pixhawk-pwm reversible` banner. If the console is silent, UART4 is not the
    VCP or the baud differs; the deployed build's console port was inferred, not read.
@@ -346,6 +361,10 @@ the bus voltage thresholds, the telemetry periods.
   when either is pulled. Fault code 8 assumes they do.
 - Physical left/right: see "PWM contract".
 - Whether the precharge path can take repeated start-up attempts (hence the retry limit).
+- Where the CONT-line glitches come from. They are on both lines at once, roughly every
+  5 ms, shorter than a microsecond. The 8 us filter makes them irrelevant to the capture;
+  finding the source (cable, Pixhawk output stage, something on the board switching) is a
+  scope job for a quiet day.
 - The clock: `VCB.ioc` declares an HSE crystal on PH0/PH1 but cttdev's `SystemClock_Config`
   runs the PLL from HSI. Its frequency is unknown, so this build does not switch. Moving
   to HSE would make the microsecond timebase crystal-accurate and let the deadband shrink.
