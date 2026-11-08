@@ -8,16 +8,18 @@
 SERVO9_FUNCTION,74
 SERVO10_FUNCTION,73
 # VCB: 25 us deadband around 1500, then (|us-1500| - 25) * 1000/475 permille, applied =
-# clamp(raw, -200, +200) at the default THRUST_LIMIT_PERMILLE. MIN/MAX 1380/1620 put
-# Rover's full throttle range on the usable band (full forward = +20 %, full reverse =
-# -20 %). TRIM 1500 = stop, also the disarmed output, which is what arms the VCB.
-# Widen MIN/MAX when the VCB limit is raised.
-SERVO9_MIN,1380
+# clamp(raw, -THRUST_LIMIT_PERMILLE, +THRUST_LIMIT_PERMILLE). 2026-11-08 with VCB 0.3.3: the
+# Pixhawk outputs the full 1000..2000 us and the VCB's 600 permille (60 %) clamp is the only
+# thrust limit; 60 % is reached at 1810 / 1190 us, Rover throttle beyond ~62 % is flat.
+# (0.3.2 and earlier: 1380/1620 = the 20 % band.) DO NOT apply with 0.3.2 or older flashed
+# and expect more thrust: that firmware still clamps at 20 %.
+# TRIM 1500 = stop, also the disarmed output, which is what arms the VCB.
+SERVO9_MIN,1000
 SERVO9_TRIM,1500
-SERVO9_MAX,1620
-SERVO10_MIN,1380
+SERVO9_MAX,2000
+SERVO10_MIN,1000
 SERVO10_TRIM,1500
-SERVO10_MAX,1620
+SERVO10_MAX,2000
 #
 # RC switches on the RadioMaster Boxer (ELRS XR3 on TELEM2, SERIAL2_PROTOCOL 23), set 2026-11-03.
 # Switch sense as chosen on the Boxer 2026-11-03, with the switches left in the disarm /

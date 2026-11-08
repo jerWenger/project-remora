@@ -8,14 +8,17 @@
 #define VCB_CONFIG_H
 
 #define FW_NAME     "VCB pixhawk-pwm reversible"
-#define FW_VERSION  "0.3.2"
+#define FW_VERSION  "0.3.3"
 
 /* ---- Thrust limit -------------------------------------------------------
  * Hard cap applied to the command sent to the ePropulsion converter, in both
- * directions. 200 = 20 %, the same posture as the deployed bench build.
- * Raise it deliberately, after the bench and dock tests in README.md.
+ * directions. 0.3.0-0.3.2: 200 = 20 %, the same posture as the deployed bench
+ * build. 0.3.3 (2026-11-08): 600 = 60 %, after the first RC run on the water
+ * showed too little authority at 20 %. This is now the only thrust limit: the
+ * Pixhawk outputs the full 1000..2000 us (params/vcb-pixhawk.parm), so 60 % is
+ * reached at 1810 us / 1190 us and the stick beyond that is flat.
  */
-#define THRUST_LIMIT_PERMILLE        200
+#define THRUST_LIMIT_PERMILLE        600
 
 /* ---- Direction change ----------------------------------------------------
  * When the sign of a channel's command flips, 0 is sent instead until this

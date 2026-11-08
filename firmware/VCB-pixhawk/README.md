@@ -3,6 +3,10 @@
 Best-effort re-creation of the VCB (Vehicle Control Board, STM32H723VG) firmware
 that runs on the boat, built from the only source we have, plus reverse thrust.
 
+**Version 0.3.3 (2026-11-08): `THRUST_LIMIT_PERMILLE` 200 -> 600 (60 %), nothing else
+changed; the Pixhawk now outputs the full 1000..2000 us and the VCB is the only limit. Not yet
+run at the new limit: the dock end-point hold and full-forward-to-full-reverse slam come first.**
+
 **Version 0.3.2 (2026-10-25). Status: 0.3.0 was flashed on the boat on 2026-10-25 and
 proved the console both ways (banner, headers, `help`), but its PWM capture never
 qualified: sub-microsecond glitches on both CONT lines, about every 5 ms, were captured as

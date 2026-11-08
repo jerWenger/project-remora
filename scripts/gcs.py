@@ -764,17 +764,19 @@ function biBar(label,frac,text,cls){
   const f=frac==null?0:Math.max(-1,Math.min(1,frac));
   i.style.left=(f<0?50+f*50:50)+'%';i.style.width=Math.abs(f)*50+'%';
   b.append(i,el('b'),el('span',null,text));w.append(b);return w;}
-// Reversible VCB (params/vcb-pixhawk.parm): 1500 us = stop, 1380..1620 = full Rover range = -/+20 %.
+// Reversible VCB (params/vcb-pixhawk.parm): 1500 us = stop, 1000..2000 = full Rover range.
+// VCB 0.3.3 clamps at +-600 permille (60 %), reached at 1810 / 1190 us.
+const VCB_LIMIT=600,CLAMP_US=1500+25+VCB_LIMIT*0.475;
 function usBar(side,ch,us){
   const lab=`${side} · Pixhawk SERVO${ch}`;
   if(us==null||us===0)return biBar(lab,null,us===0?'0 (output off)':'no data');
-  const out=us<1380||us>1620;
-  return biBar(lab,(us-1500)/120,`${us} µs${out?' (outside 1380-1620)':''}`,out?'clamp':'');}
+  const clamp=Math.abs(us-1500)>CLAMP_US-1500;
+  return biBar(lab,(us-1500)/500,`${us} µs${clamp?' (VCB clamped)':''}`,clamp?'clamp':'');}
 function vcbBar(side,ch,pw){
   const lab=`${side} · VCB ch${ch} applied`;
   if(!pw||pw[`ch${ch}_applied_permille`]==null)return biBar(lab,null,'no data','vcb');
   const a=pw[`ch${ch}_applied_permille`],valid=pw[`ch${ch}_valid`],cmd=pw[`ch${ch}_cmd`];
-  return biBar(lab,a/200,`${a}‰ (${(a/10).toFixed(1)} %)${cmd!=null?' · cmd '+cmd:''}${valid===false||valid===0?' INVALID PWM':''} · in ${pw[`ch${ch}_us`]??'--'} µs`,'vcb');}
+  return biBar(lab,a/VCB_LIMIT,`${a}‰ (${(a/10).toFixed(1)} %)${cmd!=null?' · cmd '+cmd:''}${valid===false||valid===0?' INVALID PWM':''} · in ${pw[`ch${ch}_us`]??'--'} µs`,'vcb');}
 function renderThrusters(){
   const box=$('thr');box.replaceChildren();
   const t=VEH&&VEH.thrusters,c=VCB,online=c&&c.online,stale=c&&c.age_s!=null&&c.age_s>STALE;
