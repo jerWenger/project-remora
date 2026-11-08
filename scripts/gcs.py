@@ -52,7 +52,7 @@ MAVLINK_URL = os.environ.get("GCS_MAVLINK", "udpin:0.0.0.0:14552")
 MAV_SYSID = 254          # our source ids for stream requests (QGC usually uses 255)
 MAV_COMPID = 191         # MAV_COMP_ID_ONBOARD_COMPUTER
 STREAM_HZ = 4            # rate used if we have to request streams
-SERVICES = ["boat-gcs", "mediamtx", "mavlink-router", "battery-litime", "vcb-logger"]
+SERVICES = ["boat-gcs", "mediamtx", "mavlink-router", "battery-litime", "vcb-logger", "estop-latch"]
 STALE_S = 10.0
 # RC switches (params/vcb-pixhawk.parm, set 2026-11-03). Raw PWM as the Pixhawk reports it
 # in RC_CHANNELS, before RCn_REVERSED: RC8 987 = motor emergency stop, 2011 = cleared;
@@ -715,7 +715,7 @@ async function pollBatt(){try{const r=await fetch('/api/battery');const b=await 
 setInterval(pollBatt,2000);pollBatt();
 
 // ---- vehicle + thrusters (vehicle and VCB polled together at 1 Hz)
-let VEH=null,VCB=null;
+let VEH=null,VCB=null,EST=null;
 function renderVehicle(){
   const box=$('veh'),v=VEH;box.replaceChildren();
   const hl=$('hdrlink'),hv=$('hdrveh');
@@ -823,9 +823,12 @@ function renderStrip(){
   if(!hb||!L.connected)tile('t_arm','NO LINK','grey',hb?'last heartbeat '+ago(L.heartbeat_age_s):'');
   else tile('t_arm',hb.armed?'ARMED':'DISARMED',hb.armed?'red':'green',
     `${hb.mode} · switch ${sw.arm_switch||'?'}`);
-  if(sw.estop==='engaged')tile('t_estop','ENGAGED','red',`ch${sw.estop_ch} ${sw.estop_us} µs · outputs held at 1500`);
-  else if(sw.estop==='clear')tile('t_estop','CLEAR','green',`ch${sw.estop_ch} ${sw.estop_us} µs`);
-  else tile('t_estop','UNKNOWN','grey',sw.rc_ok===false?'no RC data':'');
+  // HV latch (estop-latch.service): fault 9 at the VCB, cleared only by vcbclear
+  const latchUp=EST&&EST.ts&&(Date.now()/1000-EST.ts)<3,latched=latchUp&&EST.latched;
+  const latchTxt=!latchUp?'HV latch service DOWN':latched?'HV latched OFF (vcbclear)':'HV latch armed';
+  if(sw.estop==='engaged')tile('t_estop','ENGAGED','red',`${sw.estop_us} µs · ${latchTxt}`);
+  else if(sw.estop==='clear')tile('t_estop',latched?'CLEAR · LATCHED':'CLEAR',latched||!latchUp?'amber':'green',`${sw.estop_us} µs · ${latchTxt}`);
+  else tile('t_estop','UNKNOWN','grey',(sw.rc_ok===false?'no RC data · ':'')+latchTxt);
   if(sw.rc_ok)tile('t_rc','OK','green',sw.rssi!=null?'RSSI '+sw.rssi+'/254':'');
   else tile('t_rc','NO RC','amber',hb?'failsafe if armed (Hold)':'');
   const c=VCB,st=c&&c.status,stale=!c||!c.online||(c.age_s!=null&&c.age_s>STALE);
@@ -838,8 +841,8 @@ function renderStrip(){
     `bus ${st.bus_mv==null?'--':(st.bus_mv/1000).toFixed(1)+' V'} · TSMS ${st.tsms_24v_present?'on':'OFF'}`);
 }
 async function pollVeh(){
-  try{const [a,b]=await Promise.all([fetch('/api/vehicle'),fetch('/api/vcb')]);VEH=await a.json();VCB=await b.json();}
-  catch(e){VEH=null;VCB=null;}
+  try{const [a,b,c]=await Promise.all([fetch('/api/vehicle'),fetch('/api/vcb'),fetch('/api/estop')]);VEH=await a.json();VCB=await b.json();EST=await c.json();}
+  catch(e){VEH=null;VCB=null;EST=null;}
   try{renderVehicle();}catch(e){console.error(e);}
   try{renderThrusters();}catch(e){console.error(e);}
   try{renderStrip();}catch(e){console.error(e);}
@@ -895,6 +898,8 @@ class H(BaseHTTPRequestHandler):
                                        {"online": False, "msg": "RS485 not connected"}))
         elif path == "/api/vcb":
             self._json(read_state_json("vcb.json", {"online": False, "msg": "no vcb.json"}))
+        elif path == "/api/estop":
+            self._json(read_state_json("estop.json", {"msg": "no estop.json (estop-latch not running?)"}))
         elif path == "/api/vehicle":
             self._json(MAV.snapshot())
         elif path == "/api/health":

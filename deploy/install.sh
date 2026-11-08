@@ -11,8 +11,8 @@ BOAT=boat
 HOME_B=/home/boat
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TS=$(date +%Y%m%d_%H%M%S)
-UNITS=(boat-gcs mediamtx mavlink-router battery-litime vcb-logger)
-SCRIPTS=(gcs.py battery_litime.py vcb_logger.py)
+UNITS=(boat-gcs mediamtx mavlink-router battery-litime vcb-logger estop-latch)
+SCRIPTS=(gcs.py battery_litime.py vcb_logger.py estop_latch.py)
 DRY=0 RESTART=0
 
 for a in "$@"; do
@@ -68,6 +68,13 @@ for s in "${SCRIPTS[@]}"; do
     run ln -s "$tgt" "$lnk"
     run chown -h "$BOAT:$BOAT" "$lnk"
 done
+
+say "shell aliases (resetvcb, vcb, vcbclear, estop, vcbwatch)"
+put "$REPO/deploy/boat-aliases.sh" "$HOME_B/.boat_aliases" 644 "$BOAT" || true
+if ! grep -qs 'boat_aliases' "$HOME_B/.bashrc"; then
+    echo "+ append '. ~/.boat_aliases' to $HOME_B/.bashrc"
+    if [[ $DRY == 0 ]]; then echo '[ -f ~/.boat_aliases ] && . ~/.boat_aliases' >> "$HOME_B/.bashrc"; fi
+fi
 
 say "old mavlink-router loop (not systemd)"
 hits=()

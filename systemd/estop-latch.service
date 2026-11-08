@@ -1,0 +1,13 @@
+[Unit]
+Description=RC8 e-stop -> latched 'stop' (fault 9, contactors open) at the VCB
+After=mavlink-router.service vcb-logger.service
+
+[Service]
+User=boat
+WorkingDirectory=/home/boat
+ExecStart=/usr/bin/python3 -u /home/boat/estop_latch.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
