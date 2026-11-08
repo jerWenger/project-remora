@@ -35,20 +35,23 @@ SERIAL1_BAUD,57
 # MB_TYPE 1 uses GPS1_MB_OFS_*, which only appear after MB_TYPE is 1 and a reboot.
 GPS1_MB_TYPE,1
 # Position of the 2nd (slave, ANT2) antenna relative to the 1st (master, ANT1), metres,
-# body frame: X forward, Y right, Z down. MEASURE centre to centre, then uncomment.
-# If the heading comes out 180 deg off, ANT1/ANT2 are swapped: swap the cables.
-#GPS1_MB_OFS_X,0.00
-#GPS1_MB_OFS_Y,0.00
-#GPS1_MB_OFS_Z,0.00
+# body frame: X forward, Y right, Z down. Measured 2026-11-08: ANT1 transom, ANT2 forward
+# on the centreline, 3.81 m. If the heading comes out 180 deg off, ANT1/ANT2 are swapped:
+# swap the cables (done once on 2026-11-08).
+GPS1_MB_OFS_X,3.81
+GPS1_MB_OFS_Y,0
+GPS1_MB_OFS_Z,0
 
 # --- Compass -------------------------------------------------------------
 # NOTE 2026-10-18: the DroneCAN puck (compass 1 below) is unplugged while the UM982 is
 # in. With GPS yaw working the compass matters less; revisit COMPASS_USE/ORIENT then.
 # Without a compass the EKF had no heading and sat in CONST_POS_MODE.
-# COMPASS_ENABLE needs a reboot (ap_apply says so). After that: large-vehicle mag cal.
-COMPASS_ENABLE,1
-# Compass 1 = DroneCAN magnetometer in the GPS puck (DEV_ID 97539, node 125).
-COMPASS_USE,1
+# COMPASS_ENABLE needs a reboot (ap_apply says so).
+# 2026-11-08: compass off. The puck is gone; the only compass left is the internal BMM150
+# next to the motor wiring. Yaw comes from the UM982 alone (EK3_SRC1_YAW 2).
+COMPASS_ENABLE,0
+# Compass 1 was the DroneCAN magnetometer in the GPS puck (DEV_ID 97539, node 125).
+COMPASS_USE,0
 # Compass 2 = Pixhawk 6X internal BMM150, sits next to the motor wiring: don't fuse it.
 COMPASS_USE2,0
 # 0 = no rotation. VERIFY the arrow on the GPS puck points at the bow; if not, fix the
@@ -63,7 +66,8 @@ COMPASS_ORIENT,0
 # failsafes need it injected as a second battery (BATT2_MONITOR,29 via Lua) later.
 # No current/capacity meaning on this rail: capacity 0 hides the bogus "% remaining".
 # Reboot needed after BATT_MONITOR changes.
-BATT_MONITOR,21
+# 2026-11-08: off. It was never healthy with this wiring and blocked arming.
+BATT_MONITOR,0
 BATT_CAPACITY,0
 
 # --- Thruster outputs (AUX1/AUX2 -> VCB) ---------------------------------

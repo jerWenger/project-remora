@@ -18,3 +18,32 @@ SERVO9_MAX,1620
 SERVO10_MIN,1380
 SERVO10_TRIM,1500
 SERVO10_MAX,1620
+#
+# RC switches on the RadioMaster Boxer (ELRS XR3 on TELEM2, SERIAL2_PROTOCOL 23), set 2026-11-03.
+# Switch sense as chosen on the Boxer 2026-11-03, with the switches left in the disarm /
+# e-stop position the whole time: Pixhawk reads RC5 999 and RC8 987 there. Option 153 arms on
+# logical high, so RC5 is not reversed (999 = disarm, 2000 = arm). Option 31 stops on logical
+# high, so RC8 is reversed (987 = motor emergency stop, 2011 = cleared); RC_OPTIONS bit 7
+# makes REVERSED apply to switches. Verified live: 'PreArm: Motors Emergency Stopped' with
+# the switches untouched. E-stop forces AUX1/AUX2 to 1500 us, VCB sees cmd 0. Arm/disarm
+# fires on switch movement, not on boot.
+RC5_OPTION,153
+RC5_REVERSED,0
+RC8_OPTION,31
+RC8_REVERSED,1
+RC_OPTIONS,8352     # 32 throttle-neutral arming check + 128 switch reverse + 8192 ELRS 420 kbaud
+# Applied 2026-11-08 on the boat (pre-arm blockers for RC in Manual; one reboot):
+RC3_TRIM,1500        # throttle is spring-centred; Rover treats throttle as an angle about TRIM
+ARMING_RUDDER,0      # no stick arming on a boat; RC5 is the only arm path
+COMPASS_ENABLE,0     # internal BMM150 only, uncalibrated; yaw comes from the UM982 (EK3_SRC1_YAW 2)
+COMPASS_USE,0
+BATT_MONITOR,0       # PM02D never healthy; pack is read by the Jetson from the LiTime BMS
+# UM982 baseline, measured 2026-11-08: ANT1 on the transom, ANT2 forward on the centreline,
+# 12.5 ft = 3.81 m, no significant Y/Z or yaw offset. First fit read ~157 deg with the bow
+# near north (cables swapped); after swapping ANT1/ANT2 at the receiver it reads close to
+# the bow. Heading with no compass now depends on the UM982's heading solution.
+GPS1_MB_OFS_X,3.81
+GPS1_MB_OFS_Y,0
+GPS1_MB_OFS_Z,0
+# Still pending: only once QGC shows no PreArm messages after the reboot above.
+#ARMING_SKIPCHK,0    # was 64 (RC checks skipped); RC is calibrated now
