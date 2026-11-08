@@ -54,6 +54,13 @@ MAV_COMPID = 191         # MAV_COMP_ID_ONBOARD_COMPUTER
 STREAM_HZ = 4            # rate used if we have to request streams
 SERVICES = ["boat-gcs", "mediamtx", "mavlink-router", "battery-litime", "vcb-logger"]
 STALE_S = 10.0
+# RC switches (params/vcb-pixhawk.parm, set 2026-11-03). Raw PWM as the Pixhawk reports it
+# in RC_CHANNELS, before RCn_REVERSED: RC8 987 = motor emergency stop, 2011 = cleared;
+# RC5 999 = disarm, 2000 = arm.
+ESTOP_CH = int(os.environ.get("GCS_ESTOP_CH", "8"))
+ESTOP_ENGAGED_BELOW = int(os.environ.get("GCS_ESTOP_ENGAGED_BELOW", "1300"))
+ESTOP_CLEAR_ABOVE = int(os.environ.get("GCS_ESTOP_CLEAR_ABOVE", "1700"))
+ARM_CH = int(os.environ.get("GCS_ARM_CH", "5"))
 
 
 def _soap(body: str) -> str:
@@ -146,7 +153,7 @@ MAV_CMD_SET_MESSAGE_INTERVAL = 511
 # Messages the dashboard needs: name -> MAVLink id (for SET_MESSAGE_INTERVAL).
 WANTED = {"GPS_RAW_INT": 24, "ATTITUDE": 30, "GLOBAL_POSITION_INT": 33,
           "SERVO_OUTPUT_RAW": 36, "VFR_HUD": 74, "SYS_STATUS": 1,
-          "POWER_STATUS": 125, "EKF_STATUS_REPORT": 193}
+          "POWER_STATUS": 125, "EKF_STATUS_REPORT": 193, "RC_CHANNELS": 65}
 
 
 def _idx(table, i):
@@ -173,6 +180,37 @@ def _mode_name(hb_type, custom_mode):
 
 def _r(x, n=1):
     return None if x is None else round(x, n)
+
+
+def _switches(rc, statustext):
+    """E-stop (RC8) and arm switch (RC5) positions from RC_CHANNELS.
+    'unknown' when there is no fresh RC data or the channel reads 0 (no RC input)."""
+    out = {"estop": "unknown", "estop_us": None, "arm_switch": "unknown", "arm_us": None,
+           "rc_ok": False, "rssi": None, "estop_ch": ESTOP_CH, "arm_ch": ARM_CH}
+    if not rc or rc["age_s"] > 3:
+        return out
+    out["rssi"] = rc.get("rssi")
+    e = rc["ch"].get(str(ESTOP_CH)) or 0
+    a = rc["ch"].get(str(ARM_CH)) or 0
+    out["rc_ok"] = rc.get("chancount", 0) > 0 and e > 0
+    out["estop_us"], out["arm_us"] = e or None, a or None
+    if 800 < e < ESTOP_ENGAGED_BELOW:
+        out["estop"] = "engaged"
+    elif e > ESTOP_CLEAR_ABOVE:
+        out["estop"] = "clear"
+    if 800 < a < 1300:
+        out["arm_switch"] = "disarm"
+    elif a > 1700:
+        out["arm_switch"] = "arm"
+    # The Pixhawk's own word wins while it is recent: radio failsafe means the RC values
+    # are the last ones held, not the switch positions.
+    for st in reversed(statustext or []):
+        if st["age_s"] > 5:
+            break
+        if "Radio failsafe on" in st["text"] or "Radio Failsafe" in st["text"]:
+            out["rc_ok"] = False
+            break
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -352,6 +390,11 @@ class MavMonitor:
                 sv["ch"][str(i + 8)] = getattr(m, f"servo{i}_raw")
             sv["src9_16"] = "port1"
 
+    def _h_RC_CHANNELS(self, m, now):
+        ch = {str(i): getattr(m, f"chan{i}_raw", 0) for i in range(1, 19)}
+        self.s["rc"] = {"t": now, "ch": ch, "chancount": m.chancount,
+                        "rssi": None if m.rssi == 255 else m.rssi}
+
     def _h_SYS_STATUS(self, m, now):
         p, e, h = (m.onboard_control_sensors_present, m.onboard_control_sensors_enabled,
                    m.onboard_control_sensors_health)
@@ -412,7 +455,7 @@ class MavMonitor:
                     else round(now - self.last_request, 1)},
             }
             for k in ("heartbeat", "gps", "position", "ekf", "attitude", "vfr",
-                      "servo", "sys_status", "power"):
+                      "servo", "sys_status", "power", "rc"):
                 sec = self.s.get(k)
                 if sec is None:
                     out[k] = None
@@ -430,6 +473,7 @@ class MavMonitor:
         elif out.get("attitude"):
             hd = out["attitude"]["yaw_deg"]
         out["heading_deg"] = hd
+        out["switches"] = _switches(out.get("rc"), out["statustext"])
         sv = out.get("servo")
         out["thrusters"] = None if not sv else {
             "left_us": sv["ch"].get(str(LEFT_CH)), "right_us": sv["ch"].get(str(RIGHT_CH)),
@@ -573,11 +617,29 @@ header h1{font-size:15px;margin:0;font-weight:600}
 .svc{display:flex;align-items:center;gap:8px;padding:3px 0}.svc .n{flex:1}
 .small{font-size:12px}.chips span{display:inline-block;font-size:11px;padding:1px 6px;margin:2px 2px 0 0;border-radius:8px;background:#21262d;border:1px solid var(--line)}
 .chips span.bad{border-color:var(--bad);color:#ffd7d5}.chips span.good{border-color:#238636}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px 16px 0}
+.tile{border:2px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel);min-width:0}
+.tile .k{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+.tile .s{font-size:24px;font-weight:800;line-height:1.15;overflow-wrap:anywhere}
+.tile .d{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tile.red{border-color:var(--bad);background:#3d1214}.tile.red .s{color:#ffd7d5}
+.tile.green{border-color:var(--ok);background:#12361f}.tile.green .s{color:#aff5b4}
+.tile.amber{border-color:var(--warn);background:#3a2a0b}.tile.amber .s{color:#f8e3a1}
+.tile.grey .s{color:var(--mut)}
+.bar.bi i{left:auto}.bar.bi b{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--mut)}
+@media (max-width:620px){.strip{padding:10px 10px 0;grid-template-columns:repeat(2,minmax(0,1fr))}.tile .s{font-size:20px}}
 </style></head><body>
 <header><span class=dot id=camdot></span><h1>Boat Ground Station</h1>
 <span class=muted id=status>connecting…</span>
 <span style="flex:1"></span>
 <span class=dot id=hdrlink></span><span id=hdrveh class=muted>vehicle: --</span></header>
+<div class=strip id=strip>
+ <div class="tile grey" id=t_arm><div class=k>Pixhawk</div><div class=s>--</div><div class=d></div></div>
+ <div class="tile grey" id=t_estop><div class=k>E-stop (RC8)</div><div class=s>--</div><div class=d></div></div>
+ <div class="tile grey" id=t_vcb><div class=k>VCB</div><div class=s>--</div><div class=d></div></div>
+ <div class="tile grey" id=t_hv><div class=k>HV contactors</div><div class=s>--</div><div class=d></div></div>
+ <div class="tile grey" id=t_rc><div class=k>RC link</div><div class=s>--</div><div class=d></div></div>
+</div>
 <div class=wrap>
  <div class=main>
   <div class=video><iframe id=cam allow="autoplay" src=""></iframe></div>
@@ -695,15 +757,24 @@ function bar(label,frac,text,cls){
   const w=el('div','thr');const lb=el('div','lbl');lb.append(el('span',null,label));w.append(lb);
   const b=el('div','bar'+(cls?' '+cls:''));const i=el('i');i.style.width=(frac==null?0:Math.max(0,Math.min(1,frac))*100)+'%';
   b.append(i,el('span',null,text));w.append(b);return w;}
-function usBar(side,ch,us){ // Pixhawk 1000-1200 us usable band = 0-20 % thrust
-  if(us==null||us===0)return bar(`${side} · Pixhawk SERVO${ch}`,null,us===0?'0 (output off)':'no data');
-  const clamp=us>1200;
-  return bar(`${side} · Pixhawk SERVO${ch}`,(us-1000)/200,`${us} µs${clamp?' (>1200 clamped)':''}`,clamp?'clamp':'');}
+// Bidirectional bar: centre = stop, right = forward, left = reverse. frac in -1..1.
+function biBar(label,frac,text,cls){
+  const w=el('div','thr');const lb=el('div','lbl');lb.append(el('span',null,label));w.append(lb);
+  const b=el('div','bar bi'+(cls?' '+cls:''));const i=el('i');
+  const f=frac==null?0:Math.max(-1,Math.min(1,frac));
+  i.style.left=(f<0?50+f*50:50)+'%';i.style.width=Math.abs(f)*50+'%';
+  b.append(i,el('b'),el('span',null,text));w.append(b);return w;}
+// Reversible VCB (params/vcb-pixhawk.parm): 1500 us = stop, 1380..1620 = full Rover range = -/+20 %.
+function usBar(side,ch,us){
+  const lab=`${side} · Pixhawk SERVO${ch}`;
+  if(us==null||us===0)return biBar(lab,null,us===0?'0 (output off)':'no data');
+  const out=us<1380||us>1620;
+  return biBar(lab,(us-1500)/120,`${us} µs${out?' (outside 1380-1620)':''}`,out?'clamp':'');}
 function vcbBar(side,ch,pw){
   const lab=`${side} · VCB ch${ch} applied`;
-  if(!pw||pw[`ch${ch}_applied_permille`]==null)return bar(lab,null,'no data','vcb');
-  const a=pw[`ch${ch}_applied_permille`],valid=pw[`ch${ch}_valid`];
-  return bar(lab,a/200,`${a}‰ (${(a/10).toFixed(1)} %)${valid===false||valid===0?' INVALID PWM':''} · in ${pw[`ch${ch}_us`]??'--'} µs`,'vcb');}
+  if(!pw||pw[`ch${ch}_applied_permille`]==null)return biBar(lab,null,'no data','vcb');
+  const a=pw[`ch${ch}_applied_permille`],valid=pw[`ch${ch}_valid`],cmd=pw[`ch${ch}_cmd`];
+  return biBar(lab,a/200,`${a}‰ (${(a/10).toFixed(1)} %)${cmd!=null?' · cmd '+cmd:''}${valid===false||valid===0?' INVALID PWM':''} · in ${pw[`ch${ch}_us`]??'--'} µs`,'vcb');}
 function renderThrusters(){
   const box=$('thr');box.replaceChildren();
   const t=VEH&&VEH.thrusters,c=VCB,online=c&&c.online,stale=c&&c.age_s!=null&&c.age_s>STALE;
@@ -719,8 +790,8 @@ function renderThrusters(){
     const yn=(x,good,bad)=>x==null?'--':(x?good:bad);
     d.append(row('Thruster state',String(st.thruster_state??'--')));
     d.append(row('VCB armed',yn(st.armed,'ARMED','disarmed'),st.armed?'s3':''));
-    d.append(row('E-stop 24V',yn(st.estop_24v_present,'present (OK)','ABSENT (e-stop?)'),st.estop_24v_present?'':'s3'));
-    d.append(row('TSMS 24V',yn(st.tsms_24v_present,'present','absent')));
+    d.append(row('TSMS 24V',yn(st.tsms_24v_present,'present','ABSENT'),st.tsms_24v_present?'':'s3'));
+    if(st.fault_code)d.append(row('Fault',`${st.fault_code} ${FAULTS[st.fault_code]||''}`,'s3'));
     d.append(row('Contactors',`LSC ${yn(st.lsc_closed,'closed','open')} · HSC ${yn(st.hsc_closed,'closed','open')}`));
     d.append(row('Bus',st.bus_mv==null?'--':(st.bus_mv/1000).toFixed(1)+' V'));
   }else if(c&&online)d.append(nodata('no VCB status line yet'));
@@ -742,11 +813,36 @@ function renderMsgs(){
   for(let i=list.length-1;i>=0;i--){const m=list[i];const d=el('div','s'+m.severity);
     d.append(el('span','t',new Date(m.t*1000).toLocaleTimeString()+' '+m.sev));d.append(document.createTextNode(m.text));if(m.n>1)d.append(el('span','t',' ×'+m.n));box.append(d);}
 }
+// ---- status strip: the four things the RC operator asks "is it...?" about
+const VCB_STATES={0:'FAULT',1:'IDLE',2:'STARTING',3:'STARTING',4:'STARTING',5:'RUN'};
+const FAULTS={1:'PWM lost',2:'interlock',3:'LSC timeout',4:'interlock',5:'interlock',6:'bus low',7:'interlock',8:'contactor opened in RUN (latched: resetvcb)',9:'software stop (latched: vcb clear)'};
+function tile(id,state,color,detail){const t=$(id);t.className='tile '+color;
+  t.querySelector('.s').textContent=state;t.querySelector('.d').textContent=detail||'';}
+function renderStrip(){
+  const v=VEH,hb=v&&v.heartbeat,L=(v&&v.link)||{},sw=(v&&v.switches)||{};
+  if(!hb||!L.connected)tile('t_arm','NO LINK','grey',hb?'last heartbeat '+ago(L.heartbeat_age_s):'');
+  else tile('t_arm',hb.armed?'ARMED':'DISARMED',hb.armed?'red':'green',
+    `${hb.mode} · switch ${sw.arm_switch||'?'}`);
+  if(sw.estop==='engaged')tile('t_estop','ENGAGED','red',`ch${sw.estop_ch} ${sw.estop_us} µs · outputs held at 1500`);
+  else if(sw.estop==='clear')tile('t_estop','CLEAR','green',`ch${sw.estop_ch} ${sw.estop_us} µs`);
+  else tile('t_estop','UNKNOWN','grey',sw.rc_ok===false?'no RC data':'');
+  if(sw.rc_ok)tile('t_rc','OK','green',sw.rssi!=null?'RSSI '+sw.rssi+'/254':'');
+  else tile('t_rc','NO RC','amber',hb?'failsafe if armed (Hold)':'');
+  const c=VCB,st=c&&c.status,stale=!c||!c.online||(c.age_s!=null&&c.age_s>STALE);
+  if(stale||!st){tile('t_vcb','OFFLINE','grey',c&&c.msg||'');tile('t_hv','--','grey','');return;}
+  const name=VCB_STATES[st.thruster_state]??String(st.thruster_state);
+  if(st.thruster_state===0)tile('t_vcb','FAULT '+(st.fault_code??''),'red',FAULTS[st.fault_code]||'');
+  else tile('t_vcb',name,st.thruster_state===5?'amber':'green',`armed ${st.armed?'yes':'no'} · src ${st.cmd_source===1?'bench':'PWM'}`);
+  const closed=st.lsc_closed&&st.hsc_closed,part=st.lsc_closed||st.hsc_closed;
+  tile('t_hv',closed?'LIVE':part?'PRECHARGE':'OFF',closed?'amber':part?'amber':'green',
+    `bus ${st.bus_mv==null?'--':(st.bus_mv/1000).toFixed(1)+' V'} · TSMS ${st.tsms_24v_present?'on':'OFF'}`);
+}
 async function pollVeh(){
   try{const [a,b]=await Promise.all([fetch('/api/vehicle'),fetch('/api/vcb')]);VEH=await a.json();VCB=await b.json();}
   catch(e){VEH=null;VCB=null;}
   try{renderVehicle();}catch(e){console.error(e);}
   try{renderThrusters();}catch(e){console.error(e);}
+  try{renderStrip();}catch(e){console.error(e);}
   try{renderMsgs();}catch(e){console.error(e);}
 }
 setInterval(pollVeh,1000);pollVeh();
