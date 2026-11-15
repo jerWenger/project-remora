@@ -53,7 +53,7 @@ if [[ $changed == 1 ]]; then
 fi
 
 say "dirs"
-for d in mavlogs vcblogs; do
+for d in mavlogs vcblogs battlogs; do
     run install -d -m 755 -o "$BOAT" -g "$BOAT" "$HOME_B/$d"
 done
 

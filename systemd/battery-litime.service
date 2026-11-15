@@ -1,5 +1,5 @@
 [Unit]
-Description=LiTime BMS reader (RS485 via FTDI) -> /home/boat/battery.json
+Description=LiTime BMS reader (RS485 via FTDI) -> /home/boat/battery.json + battlogs/batt_YYYYMMDD.csv
 After=local-fs.target
 
 [Service]

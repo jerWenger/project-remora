@@ -1,0 +1,42 @@
+# Second tune, from the 2026-11-12 Auto run (log 13, fig-8 at 1.5 m/s with tune-2026-11-12.parm).
+# Numbers from tools/ap_auto_report.py. Apply (disarmed):
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-15.parm --dry-run
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-15.parm
+# Undo: the params/backup_<UTC>.parm that ap_apply writes.
+#
+# What log 13 showed: the boat followed the path (cross-track 0.9 m rms) but by weaving the whole
+# way: yaw rate +-13 deg/s with a 7.4 s period, desired turn rate pinned at +-20 deg/s 43 % of
+# the time, the two motors at full and opposed 72 % of the time, each motor changing direction
+# 17 times a minute. The rate loop is not the cause: fitted to that run the yaw plant is
+# 15.8 deg/s per full steering (FF 3.6, the 4.0 was right), lag 1.26 s, delay 0.7 s.
+# The cause is the position controller above it. Around a straight line PSC_VEL_P acts as a
+# heading gain in 1/s; at 1.0 it crosses over where the lag + delay have already used 180 deg
+# of phase. A simulation of that loop with the fitted plant weaves at 7.5 s, as measured, and
+# is quiet from 0.5 down; 0.3 still settles if the lag is a third worse than fitted.
+
+# --- the fix ------------------------------------------------------------------------------------
+PSC_VEL_P,0.3          # was 1.0. Ladder on the water: 0.3 -> 0.4 -> 0.5 while ap_auto_report says
+                       # "no sustained weave"; back one step when the 6-12 s weave returns
+
+# --- stop asking for turn rates the hull cannot give at speed -----------------------------------
+ATC_STR_RAT_MAX,12     # was 20. Full steering gives ~16 deg/s at 1.35 m/s (19-22 only in a pivot),
+                       # so 20 meant full opposed thrust on every correction
+ACRO_TURN_RATE,12      # was 20. Same limit for the stick in Acro
+WP_PIVOT_RATE,12       # was 15. ATC_STR_RAT_MAX caps it anyway; keep them consistent
+ATC_STR_RAT_FF,3.6     # was 4.0. Fitted at 1.35 m/s; a 10 % trim, P/I stay 1.0/1.0
+
+# --- end of mission -------------------------------------------------------------------------------
+MIS_DONE_BEHAVE,0      # was 1 (Loiter, never tested on this boat). 0 = Hold: motors to neutral, coast
+
+# --- slew: gentler steering and throttle moves (added 2026-11-15) ---------------------------------
+# Rover has no output slew on steering: MOT_SLEWRATE acts on the throttle before the skid-steer
+# mix. What limits how fast steering moves is the acceleration limit on the desired turn rate,
+# because steering is mostly FF x desired rate.
+ATC_STR_ACC_MAX,10     # was 30 deg/s/s. 0 -> 12 deg/s in 1.2 s; a full left-to-right swing of the
+                       # differential takes ~2.4 s instead of 0.8 s. In the loop model this does not
+                       # bring the weave back at PSC_VEL_P 0.3-0.5 (it only acts on large moves)
+MOT_SLEWRATE,50        # was 100 %/s. Throttle 0 -> 100 % in 2 s. Applies in EVERY mode, Manual
+                       # included, and to the throttle going back to zero: stick-to-neutral and Hold
+                       # take up to 2 s from full instead of 1 s
+ATC_ACCEL_MAX,0.5      # was 1 m/s/s. Speed setpoint ramps at half the rate in Auto/Guided/Acro, so
+                       # the speed loop asks for less than the throttle slew can deliver

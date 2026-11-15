@@ -1,0 +1,46 @@
+# First tune from the 2026-11-12 Manual runs (logs 11 and 12, 60 % VCB limit, SERVO9/10 1190/1810).
+# Numbers from tools/ap_tune_report.py; reasoning per line. Apply:
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-12.parm --dry-run
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-12.parm
+# Undo: the params/backup_<UTC>.parm that ap_apply writes.
+#
+# Measured (Rover throttle % = (us-1500)/310):
+#   straight, both directions averaged:  21 % 0.71 m/s | 45 % 1.75 m/s (1.55-1.7 N-bound, 1.8-2.0 S-bound)
+#                                        75 % 2.71 m/s | 100 % 3.08 m/s (3.06 / 3.11 opposite ways)
+#   ~linear to 75 %, then hull speed. Accel tau 1.1-1.7 s, plus ~1 s lag (slew + outboard spin-up).
+#   pivot, full steering: 19 deg/s (16.6 left, 21.9 right).  At 1.85 m/s, 83 % steering: 8.6-8.9 deg/s.
+#   At 2.2 m/s, 68 % steering: 4.9-6.0 deg/s.  The hull resists yaw more with speed:
+#   steering per rad/s = 3.0 (pivot), 5.4 (1.85 m/s), 7.1 (2.2 m/s). Turn radius 12 m at 1.85 m/s.
+#   Floor: 10 % stick does not move the boat, 13 % does. The VCB deadband alone is 25 us = 8 %.
+
+# --- motor output ---------------------------------------------------------------------------
+MOT_THR_MIN,8          # was 0. Exactly the VCB's 25 us deadband (25/310). Any non-zero Rover throttle
+                       # lands at the edge of thrust instead of in a dead zone the loops wind up in.
+                       # Also lifts each motor in a pivot. Changes Manual stick feel only inside 0-8 %.
+
+# --- speed ------------------------------------------------------------------------------------
+CRUISE_SPEED,1.75      # was 2. 45 % throttle, averaged N/S-bound
+CRUISE_THROTTLE,40     # was 50. 45 % output, re-expressed after MOT_THR_MIN: (45-8)/0.92
+SPEED_MAX,3.0          # was 0 (unset). Measured top at the 60 % limit
+# ATC_SPEED_P/I stay 0.2/0.2: with the cruise feed-forward right, these only trim; plant gain
+# ~4 m/s per unit throttle, tau ~2 s at cruise.
+WP_SPEED,1.5           # was 2. Inside the linear part of the speed curve, turn radius ~9 m
+
+# --- steering ---------------------------------------------------------------------------------
+ATC_STR_RAT_FF,4.0     # was 0.2 (20x too low). 3.0 pivot .. 5.4 at 1.85 m/s; 4 for ~1.5 m/s work
+ATC_STR_RAT_P,1.0      # was 0.2. Scaled with FF; 6 deg/s error -> 0.1 steering
+ATC_STR_RAT_I,1.0      # was 0.2. Absorbs the FF's speed dependence within a few seconds
+ATC_STR_RAT_MAX,20     # was 120 deg/s. Pivot max is 19-22
+ACRO_TURN_RATE,20      # was 180. Same
+ATC_STR_ACC_MAX,30     # was 120 deg/s/s. Gentler rate demands; 0 -> 20 deg/s in 0.7 s
+ATC_STR_ANG_P,1.0      # was 2. Heading loop slower than the ~1 s output lag, to avoid weaving
+ATC_TURN_MAX_G,0.025   # was 0.6. Measured lateral accel 0.23-0.28 m/s/s; makes the path planner
+                       # slow down for corners the boat can actually make
+
+# --- waypoints --------------------------------------------------------------------------------
+WP_RADIUS,5            # was 2. Boat ~5 m long, turn radius ~9 m
+WP_PIVOT_ANGLE,60      # was 0 (off). Corners sharper than 60 deg: slow, pivot at 15 deg/s, go on
+WP_PIVOT_RATE,15       # was 60. Below the 19 deg/s pivot max
+
+# --- mode switch, for the Auto box today (put back to 15 for Guided/MOOS) -------------------------
+MODE4,10               # was 15 (Guided). RC6 mid = Auto; low = Hold, high = Manual unchanged
