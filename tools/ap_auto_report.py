@@ -36,17 +36,18 @@ except ImportError:
     raise SystemExit("pip install pymavlink")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TYPES = ["PIDS", "PIDA", "STER", "THR", "NTUN", "RCOU", "MODE", "ARM", "PARM"]
+TYPES = ["PIDS", "PIDA", "STER", "THR", "NTUN", "RCOU", "MODE", "ARM", "PARM", "POS", "CMD"]
 FIELDS = {
     "PIDS": ("Tar", "Act", "P", "I", "FF"), "PIDA": ("Tar", "Act", "P", "I", "FF"),
     "STER": ("SteerOut", "DesTurnRate", "TurnRate"), "THR": ("ThrOut", "DesSpeed", "Speed"),
     "NTUN": ("XTrack",), "MODE": ("ModeNum",), "ARM": ("ArmState",),
+    "POS": ("Lat", "Lng"), "CMD": ("CNum", "CId", "Lat", "Lng"),
 }
 MODES = {10: "AUTO", 15: "GUIDED", 11: "RTL", 12: "SMARTRTL"}
 
 
 def extract(path):
-    cache = path + ".auto.npz"
+    cache = path + ".auto2.npz"
     if os.path.exists(cache) and os.path.getmtime(cache) >= os.path.getmtime(path):
         z = np.load(cache, allow_pickle=True)
         return {k: z[k] for k in z.files}
@@ -177,6 +178,8 @@ def analyse(d, P, t0, t1, skip):
                             for c in range(4)) for k, v in sorted(levels.items())}
     ta, pa = seg("PIDA")
     r["spd_err_rms"] = float(np.sqrt(((pa[:, 1] - pa[:, 2]) ** 2).mean()))
+    tp, po = seg("POS")
+    r["track"] = po[:, 1:3]
     r["series"] = dict(t=t - t0, tar=np.degrees(tar), act=np.degrees(act), ff=p[:, 5], pp=p[:, 3], ii=p[:, 4],
                        tt=tt - t0, des=th[:, 2], spd=th[:, 3], thr=th[:, 1], tr=tr - t0, L=L, R=R, tn=tn - t0, xt=nt[:, 1])
     return r
@@ -230,6 +233,45 @@ def plot(r, path):
     fig.tight_layout(); fig.savefig(path, dpi=100); plt.close(fig)
 
 
+def plot_track(r, d, t0, t1, path, title):
+    """Track of this stretch with the mission's waypoints (as logged in CMD), numbered."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    tr = r["track"]
+    if len(tr) < 10:
+        return False
+    lat0, lon0 = tr[0]
+    kx = 111320 * math.cos(math.radians(lat0))
+    fig, ax = plt.subplots(figsize=(11, 9))
+    ax.plot((tr[:, 1] - lon0) * kx, (tr[:, 0] - lat0) * 111320, lw=1, label="track")
+    ax.plot(0, 0, "g^", ms=9, label="start")
+    c = d.get("CMD", np.zeros((0, 5)))
+    wps = {}
+    for row in c:                                  # last upload wins; nav waypoints with a position only
+        if row[0] / 1e6 > t1:
+            break                                  # a mission uploaded after this stretch
+        if int(row[2]) == 16 and int(row[1]) > 0 and abs(row[3]) > 1:
+            wps[int(row[1])] = (row[3], row[4])
+        else:
+            wps.pop(int(row[1]), None)             # that slot now holds a DO command, not a waypoint
+    if wps:
+        ks = sorted(wps)
+        e = [(wps[k][1] - lon0) * kx for k in ks]
+        n = [(wps[k][0] - lat0) * 111320 for k in ks]
+        ax.plot(e, n, "r.--", lw=1, ms=7, label="mission")
+        seen = set()
+        for k, x, y in zip(ks, e, n):
+            key = (round(x), round(y))
+            if key not in seen:                    # repeated laps: label each spot once
+                seen.add(key)
+                ax.annotate(str(k), (x, y), fontsize=8, color="r", xytext=(3, 3), textcoords="offset points")
+    ax.set_aspect(1); ax.grid(alpha=.3); ax.legend(loc="best")
+    ax.set_xlabel("m east of start"); ax.set_ylabel("m north of start"); ax.set_title(title)
+    fig.tight_layout(); fig.savefig(path, dpi=100); plt.close(fig)
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("log")
@@ -271,6 +313,9 @@ def main():
         png = os.path.join(a.out, f"{os.path.splitext(os.path.basename(a.log))[0]}_auto{k}.png")
         plot(r, png)
         print(f"plot: {png}")
+        trk = png.replace(f"_auto{k}.png", f"_track{k}.png")
+        if plot_track(r, d, t0, t1, trk, f"{os.path.basename(a.log)}  {MODES[mode]} {t0:.0f}-{t1:.0f} s"):
+            print(f"track: {trk}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,38 @@
+//--------------------------------------------------------
+// pMarineViewer Config Block
+// MIT_SP.tif ships in <moos-ivp>/ivp/data; pMarineViewer finds it there
+// without any path (the data dir is compiled in).
+
+ProcessConfig = pMarineViewer
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  tiff_file            = MIT_SP.tif
+  set_pan_x            = -90
+  set_pan_y            = -280
+  zoom                 = 1.6
+  vehicles_shape_scale = 1.5
+  vehicles_name_mode   = names
+  circle_viewable_all  = true
+
+  appcast_viewable     = true
+  appcast_color_scheme = indigo
+
+  scope = NODE_REPORT
+  scope = ARDUROVER_MODE
+  scope = ARDUROVER_ARMED
+
+  // DEPLOY tells the helm (and the bridge) to go. On the real boat the
+  // operator still has to arm and select GUIDED from QGC or the RC: the
+  // bridge only sends velocity targets once the autopilot is already
+  // armed and in GUIDED. ALLSTOP asks the bridge to disarm.
+  button_one   = DEPLOY  # DEPLOY_ALL=true # MOOS_MANUAL_OVERRIDE_ALL=false
+  button_one   = RETURN_ALL=false # STATION_KEEP_ALL=false # ALLSTOP_ALL=false
+  button_two   = RETURN  # RETURN_ALL=true # STATION_KEEP_ALL=false
+  button_three = STATION # STATION_KEEP_ALL=true
+  button_four  = ALLSTOP # DEPLOY_ALL=false # ALLSTOP_ALL=true
+
+  action = MOOS_MANUAL_OVERRIDE_ALL=true   // bridge requests HOLD
+  action = MOOS_MANUAL_OVERRIDE_ALL=false
+}

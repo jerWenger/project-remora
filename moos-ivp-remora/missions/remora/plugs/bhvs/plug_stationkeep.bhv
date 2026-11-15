@@ -1,0 +1,16 @@
+//----------------------------------------------
+Behavior = BHV_StationKeep
+{
+  name      = station-keep
+  pwt       = 100
+  condition = MODE==STATION-KEEPING
+
+     center_activate = true
+        inner_radius = 5
+        outer_radius = 10
+         outer_speed = 0.8
+       transit_speed = 1.0
+          swing_time = 10
+        visual_hints = vertex_size=0, edge_color=gray50
+        visual_hints = label_color=invisible
+}

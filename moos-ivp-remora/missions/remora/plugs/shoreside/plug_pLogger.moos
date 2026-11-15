@@ -1,0 +1,19 @@
+//--------------------------------------------------
+// pLogger Config Block (shoreside)
+
+ProcessConfig = pLogger
+{
+  AppTick       = 10
+  CommsTick     = 10
+
+  File          = LOG_SHORESIDE
+  PATH          = ./logs/
+  AsyncLog      = true
+  FileTimeStamp = true
+
+  LogAuxSrc     = true
+  WildCardLogging = true
+  WildCardOmitPattern = *_STATUS
+  WildCardOmitPattern = DB_VARSUMMARY
+  WildCardOmitPattern = DB_RWSUMMARY
+}

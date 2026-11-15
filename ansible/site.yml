@@ -1,0 +1,47 @@
+---
+# Install MOOS-IvP, MAVSDK and this repo's moos-ivp-remora tree on the
+# boat computer (or any Ubuntu host in the inventory).
+#
+#   cd ansible
+#   ansible-playbook site.yml -K                 # everything, asks sudo password
+#   ansible-playbook site.yml -K --tags remora   # only rebuild moos-ivp-remora
+#   ansible-playbook site.yml -K -e moos_ivp_update=true   # pull + rebuild moos-ivp
+#
+# Tags: moos_ivp, mavsdk, remora
+- name: MOOS-IvP stack for Project Remora
+  hosts: all
+  gather_facts: true
+
+  pre_tasks:
+    - name: Only Debian/Ubuntu hosts are supported
+      ansible.builtin.assert:
+        that: ansible_os_family == "Debian"
+        fail_msg: "{{ inventory_hostname }} is {{ ansible_distribution }}; this playbook uses apt."
+      tags: always
+
+    - name: Show what will be installed where
+      ansible.builtin.debug:
+        msg:
+          - "host: {{ inventory_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_version }}, {{ ansible_architecture }})"
+          - "user: {{ remora_user }}"
+          - "moos-ivp: {{ moos_ivp_dir }} @ {{ moos_ivp_version }} (build-ivp.sh {{ moos_ivp_build_flags }})"
+          - "MAVSDK: {{ mavsdk_version }} ({{ mavsdk_install_method }})"
+          - "repo: {{ remora_repo_dir }}"
+      tags: always
+
+  roles:
+    - role: moos_ivp
+      tags: [moos_ivp]
+    - role: mavsdk
+      tags: [mavsdk]
+    - role: remora_moos
+      tags: [remora]
+
+  post_tasks:
+    - name: Next steps
+      ansible.builtin.debug:
+        msg:
+          - "Open a new shell (or: source {{ remora_shell_profile }}) and check: which pHelmIvP iArduRoverBridge"
+          - "Vehicle side:  cd {{ remora_moos_dir }}/missions/remora && ./launch_vehicle.sh --ip=<this host's tailscale IP> --shore=<laptop tailscale IP>"
+          - "Laptop side:   ./launch_shoreside.sh --ip=<laptop tailscale IP>"
+      tags: always

@@ -1,0 +1,27 @@
+//---------------------------------------
+// pMarinePIDV22 Config Block (XMODE=SIM only)
+// On the real boat ArduRover closes the heading and speed loops, so this
+// app is not launched in ARDUROVER mode.
+
+ProcessConfig = pMarinePIDV22
+{
+  AppTick    = 10
+  CommsTick  = 10
+
+  verbose       = false
+  depth_control = false
+  active_start  = true
+
+  yaw_pid_kp             = 0.9
+  yaw_pid_kd             = 0.6
+  yaw_pid_ki             = 0.3
+  yaw_pid_integral_limit = 0.3
+
+  speed_pid_kp             = 1.0
+  speed_pid_kd             = 0.0
+  speed_pid_ki             = 0.0
+  speed_pid_integral_limit = 0.07
+
+  maxrudder  = 100
+  maxthrust  = 100
+}

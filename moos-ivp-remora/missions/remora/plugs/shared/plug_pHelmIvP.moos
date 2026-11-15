@@ -1,0 +1,22 @@
+//------------------------------------------
+// pHelmIvP Config Block
+
+ProcessConfig = pHelmIvP
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  ok_skew    = any
+
+  Behaviors  = targs/targ_$(VNAME).bhv
+  Verbose    = false
+  Domain     = course:0:359:360
+  Domain     = speed:0:$(MAX_SPD):21
+
+  // moos-ivp main (Aug 2026) defaults park_on_allstop to true: the helm
+  // hands back control on any all-stop and needs MOOS_MANUAL_OVERRIDE=false
+  // again. When the survey completes, there is one iteration with no active
+  // behavior before MODE flips to RETURNING, and that single "NothingToDo"
+  // parked the helm. Keep the classic behaviour.
+  park_on_allstop = false
+}

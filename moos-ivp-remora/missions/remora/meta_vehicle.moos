@@ -1,0 +1,52 @@
+//-------------------------------------------------------------
+// FILE: meta_vehicle.moos  (nsplug template)
+// Vehicle community for Project Remora. Two modes, chosen by
+// launch_vehicle.sh:
+//   XMODE=SIM        uSimMarineV22 + pMarinePIDV22, everything in MOOS
+//   XMODE=ARDUROVER  iArduRoverBridge drives ArduRover (SITL or the boat)
+//                    over MAVLink; no MOOS PID, ArduPilot closes the loops
+//-------------------------------------------------------------
+ServerHost = localhost
+ServerPort = $(MOOS_PORT)
+Community  = $(VNAME)
+
+#include plugs/shared/plug_origin_warp.moos
+
+//------------------------------------------------------------
+ProcessConfig = ANTLER
+{
+  MSBetweenLaunches = 100
+
+  Run = MOOSDB             @ NewConsole = false
+  Run = pLogger            @ NewConsole = false
+  Run = pShare             @ NewConsole = false
+  Run = pHostInfo          @ NewConsole = false
+  Run = uFldNodeBroker     @ NewConsole = false
+  Run = pNodeReporter      @ NewConsole = false
+  Run = pHelmIvP           @ NewConsole = false
+  Run = pRealm             @ NewConsole = false
+  Run = uProcessWatch      @ NewConsole = false
+
+#ifdef XMODE SIM
+  Run = uSimMarineV22      @ NewConsole = false
+  Run = pMarinePIDV22      @ NewConsole = false
+#else
+  Run = iArduRoverBridge   @ NewConsole = false
+#endif
+}
+
+#ifdef XMODE SIM
+#include plugs/shared/plug_uSimMarineV22.moos
+#include plugs/shared/plug_pMarinePIDV22.moos
+#else
+#include plugs/ardurover/plug_iArduRoverBridge.moos
+#endif
+
+#include plugs/shared/plug_pLogger.moos
+#include plugs/shared/plug_pShare.moos
+#include plugs/shared/plug_pHostInfo.moos
+#include plugs/shared/plug_uFldNodeBroker.moos
+#include plugs/shared/plug_pNodeReporter.moos
+#include plugs/shared/plug_pHelmIvP.moos
+#include plugs/shared/plug_pRealm.moos
+#include plugs/shared/plug_uProcessWatch.moos

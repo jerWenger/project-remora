@@ -1,0 +1,2 @@
+Developer utility scripts for the moos-ivp-remora tree. The playbook in
+../ansible adds this directory to PATH on the Jetson.

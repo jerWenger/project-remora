@@ -1,0 +1,17 @@
+//----------------------------------------------
+// WORKAROUND, keep this block LAST in the .bhv file.
+//
+// With moos-ivp main (68d862fbd, 2026-09-18) the last BHV_Waypoint in a
+// behavior file loses its waypoints on the helm's first iteration when
+// NAV_X/NAV_Y are already in the info buffer ("No waypts given" warning,
+// then "NothingToDo" when that behavior becomes active). The stock
+// ivp/missions/s1_alpha/alpha.bhv shows it too (waypt_return). A never-
+// active BHV_Waypoint placed last absorbs it. Repro and details:
+// moos-ivp-remora/README.md, "Known issue".
+Behavior = BHV_Waypoint
+{
+  name      = zz_waypt_placeholder
+  pwt       = 1
+  condition = NEVER_TRUE = true
+  points    = pts={0,0}
+}

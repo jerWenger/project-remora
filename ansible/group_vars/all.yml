@@ -1,0 +1,47 @@
+---
+# Shared settings for every host. Override per host in inventory.yml or
+# on the command line with -e.
+
+# Unix user that owns the checkouts and gets the PATH block in ~/.bashrc.
+remora_user: "{{ ansible_user }}"
+remora_home: "/home/{{ remora_user }}"
+
+# --- moos-ivp -------------------------------------------------------------
+moos_ivp_repo: https://github.com/moos-ivp/moos-ivp.git
+# Branch, tag or commit. Pin to a sha once the boat is tuned so a re-run
+# never surprises you with a different helm.
+moos_ivp_version: main
+moos_ivp_dir: "{{ remora_home }}/moos-ivp"
+# false: clone once, never pull (re-runs are fast). Set true (-e
+# moos_ivp_update=true) to fetch and rebuild.
+moos_ivp_update: false
+# Flags for build-ivp.sh. --nogui skips pMarineViewer and the other FLTK
+# apps, which the headless Jetson does not need. Use "" for a laptop.
+moos_ivp_build_flags: "--nogui"
+moos_ivp_build_jobs: "{{ ansible_processor_vcpus | default(4) }}"
+
+# --- MAVSDK (C++ library used by iArduRoverBridge) ------------------------
+# Same major version as the laptop's brew install (3.x). v4 was not tested
+# against the bridge.
+mavsdk_version: v3.17.2
+mavsdk_repo: https://github.com/mavlink/MAVSDK.git
+# auto: install the release .deb when one exists for this OS/arch
+#       (Ubuntu x86_64), otherwise build from source (the Jetson: arm64
+#       Ubuntu 22.04 has no .deb upstream).
+# deb | source: force one method.
+mavsdk_install_method: auto
+mavsdk_src_dir: "{{ remora_home }}/src/MAVSDK"
+mavsdk_install_prefix: /usr/local
+# The Orin Nano has 8 GB; four parallel C++ jobs is the safe maximum.
+mavsdk_build_jobs: 4
+mavsdk_force_rebuild: false
+
+# --- this repo ------------------------------------------------------------
+remora_repo: https://github.com/jerWenger/project-remora.git
+remora_repo_dir: "{{ remora_home }}/project-remora"
+# The playbook never pulls an existing checkout: deploy/update.sh owns that.
+remora_moos_dir: "{{ remora_repo_dir }}/moos-ivp-remora"
+remora_build_jobs: "{{ ansible_processor_vcpus | default(4) }}"
+
+# Shell profile that receives the PATH / IVP_BEHAVIOR_DIRS block.
+remora_shell_profile: "{{ remora_home }}/.bashrc"

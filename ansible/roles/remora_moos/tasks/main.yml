@@ -1,0 +1,55 @@
+---
+# Build this repo's moos-ivp-remora tree (iArduRoverBridge and whatever is
+# added later) against the moos-ivp tree the moos_ivp role installed.
+
+- name: Clone project-remora if it is not checked out yet
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.git:
+    repo: "{{ remora_repo }}"
+    dest: "{{ remora_repo_dir }}"
+    version: main
+    update: false      # deploy/update.sh owns pulls; never touch an existing checkout
+
+- name: Confirm the moos-ivp-remora tree is present
+  ansible.builtin.stat:
+    path: "{{ remora_moos_dir }}/CMakeLists.txt"
+  register: remora_cmake
+  failed_when: not remora_cmake.stat.exists
+
+- name: Build moos-ivp-remora (incremental; cmake + make)
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.command:
+    cmd: "./build.sh -j{{ remora_build_jobs }}"
+    chdir: "{{ remora_moos_dir }}"
+  environment:
+    MOOS_IVP_ROOT: "{{ moos_ivp_dir }}"
+    CMAKE_PREFIX_PATH: "{{ mavsdk_install_prefix }}"
+  register: remora_build
+  changed_when: "'Linking' in remora_build.stdout or 'Building CXX' in remora_build.stdout"
+  async: 3600
+  poll: 15
+
+- name: Show cmake's dependency summary
+  ansible.builtin.debug:
+    msg: "{{ remora_build.stdout_lines | select('search', 'moos-ivp tree|MAVSDK') | list }}"
+
+- name: Confirm iArduRoverBridge was built
+  ansible.builtin.stat:
+    path: "{{ remora_moos_dir }}/bin/iArduRoverBridge"
+  register: remora_bridge
+  failed_when: not remora_bridge.stat.exists
+
+- name: Add moos-ivp-remora to {{ remora_shell_profile }}
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.blockinfile:
+    path: "{{ remora_shell_profile }}"
+    create: true
+    mode: "0644"
+    marker: "# {mark} moos-ivp-remora (managed by project-remora/ansible)"
+    block: |
+      PATH="$PATH:{{ remora_moos_dir }}/bin:{{ remora_moos_dir }}/scripts"
+      IVP_BEHAVIOR_DIRS="${IVP_BEHAVIOR_DIRS:+$IVP_BEHAVIOR_DIRS:}{{ remora_moos_dir }}/lib"
+      export PATH IVP_BEHAVIOR_DIRS

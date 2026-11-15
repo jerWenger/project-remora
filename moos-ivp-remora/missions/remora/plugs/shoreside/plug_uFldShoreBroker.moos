@@ -1,0 +1,16 @@
+//--------------------------------------------------
+// uFldShoreBroker Config Block
+// qbridge = FOO  is shorthand for  bridge = src=FOO_$V, alias=FOO
+//                           and    bridge = src=FOO_ALL, alias=FOO
+
+ProcessConfig = uFldShoreBroker
+{
+  AppTick   = 1
+  CommsTick = 1
+
+  qbridge = DEPLOY, RETURN, STATION_KEEP, ALLSTOP, MOOS_MANUAL_OVERRIDE
+  qbridge = NODE_REPORT, NODE_MESSAGE, APPCAST_REQ, REALMCAST_REQ
+  qbridge = SURVEY_UPDATE, RETURN_UPDATE
+
+  bridge  = src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR
+}

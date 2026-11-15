@@ -1,0 +1,46 @@
+//------------------------------------------------------------
+// iArduRoverBridge Config Block (XMODE=ARDUROVER)
+//
+// The bridge listens for MAVLink from the autopilot. The URL is built
+// as mavlink_protocol://mavlink_host:mavlink_port in code, because
+// "//" starts a comment in a .moos file.
+//
+//   Boat (Jetson):  mavlink-router [UdpEndpoint moos] sends to
+//                   127.0.0.1:14551  (config/mav.conf.new)
+//   Laptop SITL:    sim/run_sitl.sh -I N sends to 127.0.0.1:14551+10*N
+//   Laptop -> boat: --boat_tcp connects out to the router's TCP server
+//                   (tcpout, highfieldboat.tailcacf9.ts.net:5760). A link
+//                   check only: Starlink latency is no place to drive from.
+//
+// launch_vehicle.sh sets MAV_PORT (default 14551; --sitl_instance=N
+// adds 10*N). The bridge only sends velocity targets while the vehicle
+// is armed and in GUIDED; it never arms the boat itself.
+//------------------------------------------------------------
+ProcessConfig = iArduRoverBridge
+{
+  AppTick   = 10
+  CommsTick = 10
+
+  mavlink_protocol = $(MAV_PROTO)
+  mavlink_host     = $(MAV_HOST)
+  mavlink_port     = $(MAV_PORT)
+
+  command_timeout_sec = 1.0
+
+  // Pack and thruster-board state, from the files the Jetson services
+  // write (battery-litime, vcb-logger). launch_vehicle.sh fills these in
+  // when the files exist (the boat) and leaves them empty elsewhere, which
+  // turns the source off: SITL and the laptop publish no BATTERY_OK/VCB_*.
+  bms_file = $(BMS_FILE)
+  vcb_file = $(VCB_FILE)
+  boat_state_stale_sec = 5
+  battery_low_pct      = 20
+  battery_low_volts    = 44
+
+  debug = $(BRIDGE_DEBUG)
+
+  show_imu_data       = false
+  show_gps_details    = true
+  show_nav_controller = true
+  show_health_flags   = true
+}

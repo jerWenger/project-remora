@@ -1,0 +1,85 @@
+---
+# Clone and build the MOOS-IvP tree for {{ remora_user }}.
+
+- name: Build dependencies for MOOS-IvP (README-GNULINUX.txt list)
+  become: true
+  ansible.builtin.apt:
+    name:
+      - git
+      - g++
+      - cmake
+      - make
+      - patch
+      - pkg-config
+      - libfltk1.3-dev
+      - freeglut3-dev
+      - libpng-dev
+      - libjpeg-dev
+      - libxft-dev
+      - libxinerama-dev
+      - libtiff5-dev
+      - xterm
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Clone moos-ivp ({{ moos_ivp_version }}) into {{ moos_ivp_dir }}
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.git:
+    repo: "{{ moos_ivp_repo }}"
+    dest: "{{ moos_ivp_dir }}"
+    version: "{{ moos_ivp_version }}"
+    update: "{{ moos_ivp_update | bool }}"
+    depth: 1
+  register: moos_ivp_clone
+
+- name: Check for an existing MOOS-IvP build
+  ansible.builtin.stat:
+    path: "{{ moos_ivp_dir }}/bin/pHelmIvP"
+  register: moos_ivp_helm
+
+- name: Build MOOS (build-moos.sh); 10-20 min on the Orin Nano
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.command:
+    cmd: ./build-moos.sh
+    chdir: "{{ moos_ivp_dir }}"
+  environment:
+    MAKEFLAGS: "-j{{ moos_ivp_build_jobs }}"
+  async: 7200
+  poll: 30
+  when: moos_ivp_clone.changed or not moos_ivp_helm.stat.exists
+  changed_when: true
+
+- name: Build IvP (build-ivp.sh {{ moos_ivp_build_flags }}); 20-40 min on the Orin Nano
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.command:
+    cmd: "./build-ivp.sh {{ moos_ivp_build_flags }} -j{{ moos_ivp_build_jobs }}"
+    chdir: "{{ moos_ivp_dir }}"
+  async: 7200
+  poll: 30
+  when: moos_ivp_clone.changed or not moos_ivp_helm.stat.exists
+  changed_when: true
+
+- name: Confirm the core apps exist
+  ansible.builtin.stat:
+    path: "{{ moos_ivp_dir }}/bin/{{ item }}"
+  loop: [MOOSDB, pAntler, pHelmIvP, pShare, nsplug, uFldNodeBroker]
+  register: moos_ivp_bins
+  failed_when: not moos_ivp_bins.stat.exists
+
+- name: Add moos-ivp to {{ remora_shell_profile }}
+  become: true
+  become_user: "{{ remora_user }}"
+  ansible.builtin.blockinfile:
+    path: "{{ remora_shell_profile }}"
+    create: true
+    mode: "0644"
+    marker: "# {mark} moos-ivp (managed by project-remora/ansible)"
+    block: |
+      export MOOS_IVP_ROOT="{{ moos_ivp_dir }}"
+      PATH="$PATH:{{ moos_ivp_dir }}/bin:{{ moos_ivp_dir }}/scripts"
+      IVP_BEHAVIOR_DIRS="${IVP_BEHAVIOR_DIRS:+$IVP_BEHAVIOR_DIRS:}{{ moos_ivp_dir }}/lib"
+      export PATH IVP_BEHAVIOR_DIRS

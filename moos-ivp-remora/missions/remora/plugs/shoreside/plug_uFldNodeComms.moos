@@ -1,0 +1,14 @@
+//--------------------------------------------------
+// uFldNodeComms Config Block
+
+ProcessConfig = uFldNodeComms
+{
+  AppTick   = 2
+  CommsTick = 2
+
+  comms_range      = 2500
+  critical_range   = 150
+  min_msg_interval = 0
+  max_msg_length   = 1000
+  view_node_rpt_pulses = false
+}

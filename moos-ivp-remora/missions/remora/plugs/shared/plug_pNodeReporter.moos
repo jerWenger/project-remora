@@ -1,0 +1,17 @@
+//--------------------------------------------------------
+// pNodeReporter Config Block
+
+ProcessConfig = pNodeReporter
+{
+  AppTick     = 4
+  CommsTick   = 4
+
+  platform_type   = ship
+  platform_color  = $(COLOR)
+  platform_length = 6
+  terse_reports   = true
+
+  // The bridge publishes NAV_* at the ArduPilot stream rate; allow
+  // short gaps before a report goes stale.
+  nav_grace_period = 10
+}

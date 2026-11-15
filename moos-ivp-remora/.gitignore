@@ -1,0 +1,32 @@
+# Build products (bin/, lib/, build/ keep only their own .gitignore)
+bin/*
+!bin/.gitignore
+lib/*
+!lib/.gitignore
+build/*
+!build/.gitignore
+
+# nsplug output and MOOS logs
+targ_*
+*.moos++
+*._moos
+*._bhv
+.LastOpenedMOOSLogDirectory
+MOOSLog*/
+LOG_*/
+XLOG_*/
+missions/*/logs/*
+!missions/*/logs/.gitignore
+missions/*/targs/*
+!missions/*/targs/.gitignore
+*.alog
+*.blog
+*.ylog
+*.klog
+DBG_*.log
+antler_*.out
+
+# Editors
+*~
+*#
+.DS_Store

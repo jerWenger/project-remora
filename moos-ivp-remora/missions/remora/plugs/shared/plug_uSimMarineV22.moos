@@ -1,0 +1,22 @@
+//-------------------------------------------
+// uSimMarineV22 Config Block (XMODE=SIM only)
+// Rough stand-in for the RHIB with the VCB 20 % cap: top speed MAX_SPD,
+// slow turns. Not a tuned model.
+
+ProcessConfig = uSimMarineV22
+{
+  AppTick   = 10
+  CommsTick = 10
+
+  start_pos = $(START_POS)
+  prefix    = NAV
+
+  thrust_map = 100:$(MAX_SPD)
+  turn_rate  = 40
+
+  max_acceleration = 0.3
+  max_deceleration = 0.5
+
+  maxrudder  = 100
+  maxthrust  = 100
+}

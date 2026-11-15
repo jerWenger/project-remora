@@ -1,0 +1,19 @@
+//----------------------------------------------
+// Operating region: the Charles River basin in front of the pavilion.
+// Same polygon as the pavlab missions. Leaving it stops the helm.
+Behavior = BHV_OpRegionV24
+{
+  name      = opreg
+  pwt       = 300
+  condition = MODE==ACTIVE
+  updates   = RECOVER_UPDATES
+
+  core_poly = pts={60,10: -75.54,-54.26: -22,-167: 112,-107}
+
+  save_dist = 5
+  halt_dist = 10
+
+  visual_hints = edge_size = 1
+  visual_hints = save_edge_color = gray30
+  visual_hints = halt_edge_color = gray40
+}

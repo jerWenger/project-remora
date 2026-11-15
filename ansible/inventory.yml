@@ -1,0 +1,24 @@
+---
+# Hosts the MOOS-IvP playbook installs on.
+#
+# boat:  the Jetson Orin Nano on the RHIB (docs/JETSON.md). Only reachable
+#        from the team's Tailscale network.
+#
+# To install on another Ubuntu machine (a Linux laptop, a spare SBC), add it
+# under `workstations` and run:  ansible-playbook site.yml -l <name> -K
+all:
+  children:
+    boat:
+      hosts:
+        highfieldboat:
+          ansible_host: highfieldboat.tailcacf9.ts.net
+          ansible_user: boat
+          remora_user: boat
+    workstations:
+      hosts: {}
+      # example:
+      #   my-linux-laptop:
+      #     ansible_host: 192.168.1.20
+      #     ansible_user: me
+      #     remora_user: me
+      #     moos_ivp_build_flags: ""      # keep the GUI apps (pMarineViewer)

@@ -1,0 +1,138 @@
+---
+# Install the MAVSDK C++ library (headers + shared lib + CMake config) that
+# iArduRoverBridge links against.
+#
+# Upstream ships .deb packages only for x86_64 Ubuntu (and Debian arm64,
+# which does not install cleanly on Ubuntu 22.04), so the Jetson builds
+# from source. The build is a CMake "superbuild" that fetches its own
+# third-party deps (mavlink, jsoncpp, tinyxml2, curl...).
+
+- name: Decide how to install MAVSDK
+  ansible.builtin.set_fact:
+    mavsdk_method: >-
+      {{ mavsdk_install_method if mavsdk_install_method != 'auto'
+         else ('deb' if (ansible_architecture == 'x86_64'
+                         and ansible_distribution == 'Ubuntu'
+                         and ansible_distribution_version in ['22.04', '24.04'])
+               else 'source') }}
+    mavsdk_cmake_config: "{{ mavsdk_install_prefix }}/lib/cmake/MAVSDK/MAVSDKConfigVersion.cmake"
+
+- name: Check for an installed MAVSDK
+  ansible.builtin.stat:
+    path: "{{ mavsdk_cmake_config }}"
+  register: mavsdk_installed
+
+- name: Read the installed MAVSDK version
+  ansible.builtin.command:
+    cmd: grep -o 'PACKAGE_VERSION "[0-9.]*"' "{{ mavsdk_cmake_config }}"
+  register: mavsdk_installed_version
+  changed_when: false
+  when: mavsdk_installed.stat.exists
+
+- name: Work out whether a (re)install is needed
+  ansible.builtin.set_fact:
+    mavsdk_needed: >-
+      {{ mavsdk_force_rebuild | bool
+         or not mavsdk_installed.stat.exists
+         or (mavsdk_version | regex_replace('^v', '')) not in (mavsdk_installed_version.stdout | default('')) }}
+
+- name: MAVSDK already at {{ mavsdk_version }}
+  ansible.builtin.debug:
+    msg: "{{ mavsdk_installed_version.stdout | default('') }} found at {{ mavsdk_install_prefix }}; nothing to do"
+  when: not mavsdk_needed
+
+# ---------------------------------------------------------------- deb ----
+- name: Install MAVSDK from the release .deb
+  when: mavsdk_needed and mavsdk_method == 'deb'
+  block:
+    - name: Download libmavsdk-dev {{ mavsdk_version }}
+      ansible.builtin.get_url:
+        url: "https://github.com/mavlink/MAVSDK/releases/download/{{ mavsdk_version }}/libmavsdk-dev_{{ mavsdk_version | regex_replace('^v', '') }}_ubuntu{{ ansible_distribution_version }}_amd64.deb"
+        dest: "/tmp/libmavsdk-dev_{{ mavsdk_version }}.deb"
+        mode: "0644"
+
+    - name: Install the package
+      become: true
+      ansible.builtin.apt:
+        deb: "/tmp/libmavsdk-dev_{{ mavsdk_version }}.deb"
+
+# ------------------------------------------------------------- source ----
+- name: Build MAVSDK from source
+  when: mavsdk_needed and mavsdk_method == 'source'
+  block:
+    - name: Build dependencies for MAVSDK
+      become: true
+      ansible.builtin.apt:
+        name:
+          - git
+          - build-essential
+          - cmake
+          - python3
+          - pkg-config
+          - libssl-dev
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Source directory
+      become: true
+      become_user: "{{ remora_user }}"
+      ansible.builtin.file:
+        path: "{{ mavsdk_src_dir | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Clone MAVSDK {{ mavsdk_version }} with submodules
+      become: true
+      become_user: "{{ remora_user }}"
+      ansible.builtin.git:
+        repo: "{{ mavsdk_repo }}"
+        dest: "{{ mavsdk_src_dir }}"
+        version: "{{ mavsdk_version }}"
+        recursive: true
+        depth: 1
+        force: true
+
+    - name: Configure (Release, shared lib, superbuild, no mavsdk_server)
+      become: true
+      become_user: "{{ remora_user }}"
+      ansible.builtin.command:
+        cmd: >-
+          cmake -S . -B build/default
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=ON
+          -DSUPERBUILD=ON
+          -DBUILD_MAVSDK_SERVER=OFF
+          -DBUILD_TESTS=OFF
+          -DCMAKE_INSTALL_PREFIX={{ mavsdk_install_prefix }}
+        chdir: "{{ mavsdk_src_dir }}"
+      changed_when: true
+
+    - name: Compile MAVSDK (-j{{ mavsdk_build_jobs }}); 30-60 min on the Orin Nano
+      become: true
+      become_user: "{{ remora_user }}"
+      ansible.builtin.command:
+        cmd: "cmake --build build/default -j{{ mavsdk_build_jobs }}"
+        chdir: "{{ mavsdk_src_dir }}"
+      async: 10800
+      poll: 30
+      changed_when: true
+
+    - name: Install MAVSDK into {{ mavsdk_install_prefix }}
+      become: true
+      ansible.builtin.command:
+        cmd: cmake --build build/default --target install
+        chdir: "{{ mavsdk_src_dir }}"
+      changed_when: true
+
+    - name: Refresh the shared-library cache
+      become: true
+      ansible.builtin.command:
+        cmd: ldconfig
+      changed_when: false
+
+- name: Confirm the CMake package config is present
+  ansible.builtin.stat:
+    path: "{{ mavsdk_cmake_config }}"
+  register: mavsdk_check
+  failed_when: not mavsdk_check.stat.exists
