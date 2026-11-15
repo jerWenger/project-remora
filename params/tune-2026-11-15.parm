@@ -40,3 +40,8 @@ MOT_SLEWRATE,50        # was 100 %/s. Throttle 0 -> 100 % in 2 s. Applies in EVE
                        # take up to 2 s from full instead of 1 s
 ATC_ACCEL_MAX,0.5      # was 1 m/s/s. Speed setpoint ramps at half the rate in Auto/Guided/Acro, so
                        # the speed loop asks for less than the throttle slew can deliver
+
+# --- logging ----------------------------------------------------------------------------------------
+LOG_FILE_RATEMAX,10    # was 0 (no cap). Streaming log messages at most 10 Hz instead of 50: log 14 was
+                       # 225 MB (~4 MB per armed minute) and the Pixhawk hands logs out at ~450 KiB/s
+                       # at best, so size is what sets the offload time. 0 restores full-rate logging
