@@ -1,0 +1,37 @@
+//----------------------------------------------
+// One of these is spawned per contact. Distances are sized for this boat:
+// it needs ~20 m of radius to turn at 1.5 m/s and several seconds to
+// answer a heading change, so it starts caring at 80 m and wants 15-30 m
+// at the closest point. (The pavlab joust uses 25 / 8-15 m for Herons.)
+Behavior = BHV_AvdColregsV22
+{
+  name       = avdcol_
+  pwt        = 400
+
+  condition  = AVOID = true
+  condition  = MODE==ACTIVE
+  condition  = MODE!=ACTIVE:STATION-KEEPING
+
+  updates    = CONTACT_INFO
+  endflag    = CONTACT_RESOLVED = $[CONTACT]
+  templating = spawn
+
+  spawnx_flag = ENCOUNTER_START = os=$(VNAME),cn=$[CONTACT],rng=$[RANGE],rel_brg=$[OS_CN_REL_BNG],targ_ang=$[CN_OS_REL_BNG],time=$[UTC]
+  cnflag      = @cpa ENCOUNTER_END = os=$(VNAME),cn=$[CONTACT],rng=$[RANGE],rel_brg=$[OS_CN_REL_BNG],targ_ang=$[CN_OS_REL_BNG],time=$[UTC]
+
+             contact = to-be-set
+    on_no_contact_ok = true
+         extrapolate = true
+               decay = 15,30
+
+    giveway_bow_dist = 20
+        use_refinery = true
+
+      pwt_outer_dist = 80
+      pwt_inner_dist = 30
+      completed_dist = 90
+   min_util_cpa_dist = 15
+   max_util_cpa_dist = 30
+           pwt_grade = linear
+ bearing_line_config = white:0, green:0.65, yellow:0.8, red:1.0
+}

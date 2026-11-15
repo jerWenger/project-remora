@@ -1,0 +1,56 @@
+//-------------------------------------------------------------
+// FILE: meta_vehicle.moos  (nsplug template)
+// NAME: Jeremy Wenger
+// Vehicle community for the joust mission: the remora community plus a
+// contact manager. App config plugs are the ones in ../remora/plugs
+// (the launchers pass nsplug --path=../remora); only the contact
+// manager is specific to this mission.
+//   XMODE=SIM        uSimMarineV22 + pMarinePIDV22 (also the sim skiff)
+//   XMODE=ARDUROVER  iArduRoverBridge drives ArduRover (SITL or the boat)
+//-------------------------------------------------------------
+ServerHost = localhost
+ServerPort = $(MOOS_PORT)
+Community  = $(VNAME)
+
+#include plugs/shared/plug_origin_warp.moos
+
+//------------------------------------------------------------
+ProcessConfig = ANTLER
+{
+  MSBetweenLaunches = 100
+
+  Run = MOOSDB             @ NewConsole = false
+  Run = pLogger            @ NewConsole = false
+  Run = pShare             @ NewConsole = false
+  Run = pHostInfo          @ NewConsole = false
+  Run = uFldNodeBroker     @ NewConsole = false
+  Run = pNodeReporter      @ NewConsole = false
+  Run = pContactMgrV20     @ NewConsole = false
+  Run = pHelmIvP           @ NewConsole = false
+  Run = pRealm             @ NewConsole = false
+  Run = uProcessWatch      @ NewConsole = false
+
+#ifdef XMODE SIM
+  Run = uSimMarineV22      @ NewConsole = false
+  Run = pMarinePIDV22      @ NewConsole = false
+#else
+  Run = iArduRoverBridge   @ NewConsole = false
+#endif
+}
+
+#ifdef XMODE SIM
+#include plugs/shared/plug_uSimMarineV22.moos
+#include plugs/shared/plug_pMarinePIDV22.moos
+#else
+#include plugs/ardurover/plug_iArduRoverBridge.moos
+#endif
+
+#include plugs/shared/plug_pLogger.moos
+#include plugs/shared/plug_pShare.moos
+#include plugs/shared/plug_pHostInfo.moos
+#include plugs/shared/plug_uFldNodeBroker.moos
+#include plugs/shared/plug_pNodeReporter.moos
+#include plugs/shared/plug_pHelmIvP.moos
+#include plugs/shared/plug_pRealm.moos
+#include plugs/shared/plug_uProcessWatch.moos
+#include plugs/plug_pContactMgrV20.moos

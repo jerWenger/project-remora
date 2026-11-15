@@ -12,8 +12,10 @@ moos-ivp-remora/
   build.sh, clean.sh     ./build.sh [-jN] [--debug|--release]
   src/
     iArduRoverBridge/    MOOS <-> ArduRover over MAVLink (copied from mCDR-Plume-Tracking)
+    iContactUDP/         position fixes over UDP (the phone app in ../ios) -> NODE_REPORT
   missions/
     remora/              example mission: survey box off the pavilion, return, station-keep
+    joust/               leg run with COLREGS avoidance against a skiff (simulated, or a phone)
   bin/ lib/ build/       generated, not tracked
   scripts/               developer scripts (on PATH after the ansible run)
 ```

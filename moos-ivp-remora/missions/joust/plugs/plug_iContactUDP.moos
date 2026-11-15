@@ -1,0 +1,21 @@
+//--------------------------------------------------------
+// iContactUDP Config Block
+// Position fixes from the phone app (ios/RemoraContact) on the skiff
+// arrive here over the tailnet and become NODE_REPORT. uFldNodeComms
+// then hands them to the boat, whose contact manager treats the skiff
+// like any other vessel.
+
+ProcessConfig = iContactUDP
+{
+  AppTick   = 10
+  CommsTick = 10
+
+  port             = $(PHONE_PORT)
+  max_accuracy     = 30
+  min_course_speed = 0.4
+  stale_time       = 10
+
+  platform_type   = ship
+  platform_length = 4
+  platform_color  = red
+}

@@ -1,0 +1,43 @@
+//-------------------------------------------------------------
+// FILE: meta_shoreside.moos  (nsplug template)
+// NAME: Jeremy Wenger
+// Shoreside community for the joust mission: the remora shoreside plus
+// iContactUDP, which turns the skiff phone's position fixes into
+// NODE_REPORT. Shared plugs come from ../remora/plugs (nsplug --path).
+//-------------------------------------------------------------
+ServerHost = localhost
+ServerPort = $(MOOS_PORT)
+Community  = shoreside
+
+#include plugs/shared/plug_origin_warp.moos
+
+//--------------------------------------------------------
+ProcessConfig = ANTLER
+{
+  MSBetweenLaunches = 100
+
+  Run = MOOSDB          @ NewConsole = false
+  Run = pLogger         @ NewConsole = false
+  Run = pShare          @ NewConsole = false
+  Run = pHostInfo       @ NewConsole = false
+  Run = uFldShoreBroker @ NewConsole = false
+  Run = uFldNodeComms   @ NewConsole = false
+  Run = iContactUDP     @ NewConsole = false
+  Run = pRealm          @ NewConsole = false
+  Run = uProcessWatch   @ NewConsole = false
+#ifdef LAUNCH_GUI yes
+  Run = pMarineViewer   @ NewConsole = false
+#endif
+}
+
+#include plugs/shared/plug_pShare.moos
+#include plugs/shared/plug_pHostInfo.moos
+#include plugs/shared/plug_pRealm.moos
+#include plugs/shared/plug_uProcessWatch.moos
+#include plugs/shoreside/plug_pLogger.moos
+#include plugs/shoreside/plug_uFldShoreBroker.moos
+#include plugs/shoreside/plug_uFldNodeComms.moos
+#include plugs/plug_iContactUDP.moos
+#ifdef LAUNCH_GUI yes
+#include plugs/shoreside/plug_pMarineViewer.moos
+#endif

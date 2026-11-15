@@ -1,0 +1,27 @@
+//--------------------------------------------------------
+// pContactMgrV20 Config Block
+// Turns incoming NODE_REPORTs (other vehicles, or the phone on the skiff
+// through the shoreside's iContactUDP and uFldNodeComms) into contacts
+// and tells the helm when one is close enough to spawn an avoidance
+// behavior. The alert range comes from the behavior itself.
+
+ProcessConfig = pContactMgrV20
+{
+  AppTick   = 2
+  CommsTick = 2
+
+  // A phone fix can lag a few seconds over a cellular tailnet: keep a
+  // contact through short gaps, drop it after a long one.
+  decay           = 15,30
+  contact_max_age = 45
+
+  early_warning_time = 12
+  alert_verbose      = true
+
+  post_closest_range   = true
+  display_radii        = true
+  display_radii_id     = avd
+  alert_range_color    = gray70
+  cpa_range_color      = gray30
+  hold_alerts_for_helm = true
+}

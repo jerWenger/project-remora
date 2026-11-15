@@ -15,6 +15,8 @@ INCLUDE_DIRECTORIES(${LOCAL_LIBRARY_DIRS})
 #============================================================================
 # List the subdirectories to build...
 #============================================================================
+ADD_SUBDIRECTORY(iContactUDP)
+
 if(MAVSDK_FOUND)
   ADD_SUBDIRECTORY(iArduRoverBridge)
 endif()
