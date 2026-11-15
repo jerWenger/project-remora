@@ -91,6 +91,10 @@ void showExampleConfigAndExit()
   blk("  battery_low_pct   = 20     // BATTERY_OK false at or below   ");
   blk("  battery_low_volts = 44     // BATTERY_OK false at or below   ");
   blk("                                                                ");
+  blk("  // SERVOn output of each motor, for the report and debug log ");
+  blk("  left_motor_servo  = 10                                       ");
+  blk("  right_motor_servo = 9                                        ");
+  blk("                                                                ");
   blk("  // Debug logging                                             ");
   blk("  debug = true                                                 ");
   blk("}                                                               ");
@@ -135,7 +139,8 @@ void showInterfaceAndExit()
   blk("  GPS_SAT          = <int>     // Number of GPS satellites    ");
   blk("  GPS_FIX_TYPE     = <int>     // GPS fix type (3=3D fix)     ");
   blk("  GPS_HDOP         = <double>  // Horizontal DOP              ");
-  blk("  GPS_VDOP         = <double>  // Vertical DOP                ");
+  blk("  GPS_VDOP         = <double>  // Vertical DOP (not posted    ");
+  blk("                               // if the receiver has none)   ");
   blk("  GPS_HORIZ_ACCURACY = <double> // Horizontal accuracy (m)    ");
   blk("  GPS_VERT_ACCURACY  = <double> // Vertical accuracy (m)      ");
   blk("                                                                ");

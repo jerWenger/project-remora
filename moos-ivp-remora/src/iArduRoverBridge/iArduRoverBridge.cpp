@@ -69,8 +69,8 @@ iArduRoverBridge::iArduRoverBridge()
       m_mag_x(0.0),
       m_mag_y(0.0),
       m_mag_z(0.0),
-      m_gps_hdop(99.99),
-      m_gps_vdop(99.99),
+      m_gps_hdop(-1.0),
+      m_gps_vdop(-1.0),
       m_gps_horiz_accuracy(0.0),
       m_gps_vert_accuracy(0.0),
       m_battery_voltage(0.0),
@@ -87,8 +87,10 @@ iArduRoverBridge::iArduRoverBridge()
       m_fc_target_vx(0.0f),
       m_fc_target_vy(0.0f),
       m_fc_target_yaw(0.0f),
-      m_servo1_pwm(1500),
-      m_servo3_pwm(1500),
+      m_left_motor_servo(1),
+      m_right_motor_servo(3),
+      m_left_motor_pwm(1500),
+      m_right_motor_pwm(1500),
       m_throttle_pct(0.0),
       m_commands_sent(0),
       m_telemetry_updates_received(0),
@@ -175,6 +177,7 @@ bool iArduRoverBridge::Iterate()
         AppCastingMOOSApp::PostReport();
         return true;
     }
+    retractRunWarning("Not connected to ArduRover");
 
     // Get current vehicle state from telemetry (this is the source of truth)
     bool vehicle_armed = false;
@@ -317,6 +320,13 @@ bool iArduRoverBridge::OnStartUp()
         else if (param == "battery_low_volts")
         {
             handled = setNonNegDoubleOnString(m_battery_low_volts, value);
+        }
+        else if (param == "left_motor_servo" || param == "right_motor_servo")
+        {
+            int n = 0;
+            handled = setIntOnString(n, value) && n >= 1 && n <= 16;
+            if (handled)
+                (param == "left_motor_servo" ? m_left_motor_servo : m_right_motor_servo) = n;
         }
         else if (param == "show_imu_data")
         {
@@ -616,8 +626,10 @@ void iArduRoverBridge::setupTelemetrySubscriptions()
     // Subscribe to raw GPS data for detailed statistics (HDOP, VDOP, accuracy)
     m_telemetry->subscribe_raw_gps([this](Telemetry::RawGps raw_gps) {
         std::lock_guard<std::mutex> lock(m_telemetry_mutex);
-        m_gps_hdop = raw_gps.hdop;
-        m_gps_vdop = raw_gps.vdop;
+        // MAVLink sends UINT16_MAX (655.35 after scaling) for a DOP the receiver
+        // does not report; the UM982's NMEA stream has no VDOP. Keep -1 = unknown.
+        m_gps_hdop = (raw_gps.hdop >= 655.0f) ? -1.0 : raw_gps.hdop;
+        m_gps_vdop = (raw_gps.vdop >= 655.0f) ? -1.0 : raw_gps.vdop;
         m_gps_horiz_accuracy = raw_gps.horizontal_uncertainty_m;
         m_gps_vert_accuracy = raw_gps.vertical_uncertainty_m;
     });
@@ -715,9 +727,13 @@ void iArduRoverBridge::setupTelemetrySubscriptions()
             mavlink_servo_output_raw_t servo;
             mavlink_msg_servo_output_raw_decode(&msg, &servo);
             std::lock_guard<std::mutex> lock(m_telemetry_mutex);
-            // ArduRover typically: servo1=steering, servo3=throttle
-            m_servo1_pwm = servo.servo1_raw;
-            m_servo3_pwm = servo.servo3_raw;
+            const uint16_t raw[16] = {
+                servo.servo1_raw, servo.servo2_raw, servo.servo3_raw, servo.servo4_raw,
+                servo.servo5_raw, servo.servo6_raw, servo.servo7_raw, servo.servo8_raw,
+                servo.servo9_raw, servo.servo10_raw, servo.servo11_raw, servo.servo12_raw,
+                servo.servo13_raw, servo.servo14_raw, servo.servo15_raw, servo.servo16_raw};
+            m_left_motor_pwm = raw[m_left_motor_servo - 1];
+            m_right_motor_pwm = raw[m_right_motor_servo - 1];
         });
 
     // Subscribe to VFR_HUD - useful pilot info including throttle percentage
@@ -763,8 +779,10 @@ void iArduRoverBridge::publishTelemetryToMOOS()
     // Publish GPS info
     Notify("GPS_SAT", m_gps_num_sats);
     Notify("GPS_FIX_TYPE", m_gps_fix_type);
-    Notify("GPS_HDOP", m_gps_hdop);
-    Notify("GPS_VDOP", m_gps_vdop);
+    if (m_gps_hdop >= 0)
+        Notify("GPS_HDOP", m_gps_hdop);
+    if (m_gps_vdop >= 0)
+        Notify("GPS_VDOP", m_gps_vdop);
     Notify("GPS_HORIZ_ACCURACY", m_gps_horiz_accuracy);
     Notify("GPS_VERT_ACCURACY", m_gps_vert_accuracy);
 
@@ -1105,8 +1123,8 @@ void iArduRoverBridge::sendGuidedCommand(double heading_deg, double speed_mps)
             fc_tgt_vy = m_fc_target_vy;
             fc_tgt_yaw = m_fc_target_yaw;
             fc_throttle = m_throttle_pct;
-            fc_left_pwm = m_servo1_pwm;
-            fc_right_pwm = m_servo3_pwm;
+            fc_left_pwm = m_left_motor_pwm;
+            fc_right_pwm = m_right_motor_pwm;
         }
         dbg_print("%0.2f: CMD: cur_pos=(%.1f,%.1f) cur_hdg=%.1f cur_spd=%.2f | "
                  "des_hdg=%.1f des_spd=%.2f | "
@@ -1319,8 +1337,8 @@ bool iArduRoverBridge::buildReport()
     {
         m_msgs << "GPS Details: (show_gps_details=true)" << endl;
         std::lock_guard<std::mutex> lock(m_telemetry_mutex);
-        m_msgs << "  HDOP: " << doubleToStringX(m_gps_hdop, 2)
-               << "  VDOP: " << doubleToStringX(m_gps_vdop, 2) << endl;
+        m_msgs << "  HDOP: " << (m_gps_hdop >= 0 ? doubleToStringX(m_gps_hdop, 2) : "not reported")
+               << "  VDOP: " << (m_gps_vdop >= 0 ? doubleToStringX(m_gps_vdop, 2) : "not reported") << endl;
         m_msgs << "  Horiz Accuracy: " << doubleToStringX(m_gps_horiz_accuracy, 2) << " m" << endl;
         m_msgs << "  Vert Accuracy: " << doubleToStringX(m_gps_vert_accuracy, 2) << " m" << endl;
         m_msgs << endl;
@@ -1368,8 +1386,8 @@ bool iArduRoverBridge::buildReport()
         m_msgs << "  FC Target Vy: " << doubleToStringX(m_fc_target_vy, 2) << " m/s" << endl;
         m_msgs << "  FC Target Yaw: " << doubleToStringX(m_fc_target_yaw * 180.0 / M_PI, 1) << " deg" << endl;
         m_msgs << "  Throttle: " << doubleToStringX(m_throttle_pct, 0) << "%" << endl;
-        m_msgs << "  Left Motor PWM: " << m_servo3_pwm << endl;
-        m_msgs << "  Right Motor PWM: " << m_servo1_pwm << endl;
+        m_msgs << "  Left Motor PWM: " << m_left_motor_pwm << " (SERVO" << m_left_motor_servo << ")" << endl;
+        m_msgs << "  Right Motor PWM: " << m_right_motor_pwm << " (SERVO" << m_right_motor_servo << ")" << endl;
         m_msgs << endl;
     }
 

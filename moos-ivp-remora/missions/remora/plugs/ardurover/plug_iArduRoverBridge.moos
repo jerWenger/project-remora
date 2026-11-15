@@ -27,6 +27,11 @@ ProcessConfig = iArduRoverBridge
 
   command_timeout_sec = 1.0
 
+  // Skid-steer outputs on this boat (params/vcb-pixhawk.parm):
+  // SERVO10 = ThrottleLeft (73), SERVO9 = ThrottleRight (74)
+  left_motor_servo  = 10
+  right_motor_servo = 9
+
   // Pack and thruster-board state, from the files the Jetson services
   // write (battery-litime, vcb-logger). launch_vehicle.sh fills these in
   // when the files exist (the boat) and leaves them empty elsewhere, which

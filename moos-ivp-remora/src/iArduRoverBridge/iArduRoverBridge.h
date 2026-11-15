@@ -164,8 +164,11 @@ private: // Telemetry cache (thread-safe access)
     float m_fc_target_yaw;       // FC's target yaw (rad)
 
     // Motor/servo outputs (from SERVO_OUTPUT_RAW)
-    uint16_t m_servo1_pwm;       // Servo output 1 (PWM) - typically left motor or steering
-    uint16_t m_servo3_pwm;       // Servo output 3 (PWM) - typically right motor or throttle
+    // Which SERVOn carries each motor is a config choice (this boat: left 10, right 9)
+    int m_left_motor_servo;
+    int m_right_motor_servo;
+    uint16_t m_left_motor_pwm;   // us on the left motor's output
+    uint16_t m_right_motor_pwm;  // us on the right motor's output
 
     // Throttle percentage (from VFR_HUD)
     double m_throttle_pct;
