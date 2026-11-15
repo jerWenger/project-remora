@@ -112,6 +112,29 @@ reach. `uFldNodeBroker` registers the vehicle with the shoreside; `uFldShoreBrok
 back down. Arm and GUIDED still come from QGC or the RC. **The lost-link failsafes are off
 (see the top-level README); do not deploy on the water until they are set.**
 
+### Patterns, op region and the battery return
+
+`--pattern=box` (default) is the 40 m square at 1 m/s inside the pavlab basin polygon.
+`--pattern=fig8` is a smooth figure 8 with no corners: a lemniscate `--fig8_size` m long
+(default 120) and half that wide, centred on `--fig8_center` (default `0,-100`, the middle
+of the 2026-11-15 tuning area), long axis `--fig8_rot` degrees clockwise from north (default
+90, east-west), `--laps` times (default 2) at 1.5 m/s. Its tightest radius is about a third
+of the half-length (20 m at the default size), which this boat turns without reversing a
+motor. The op region for fig8 is the pattern's bounding box plus `--op_margin` (default 30 m).
+The op region only arms once the boat has been inside it, so deploying at the dock is fine.
+
+The boat returns and station-keeps on its own when the bridge posts `BATTERY_OK=false`:
+the pack at or under `--return_volts` (default 50.0) or `--return_pct` (default 20) for 10 s,
+or the BMS data gone stale for 10 s. The return latches, so a voltage that recovers once the
+load comes off does not send the boat back out. Where there is no BMS file (SITL, the laptop)
+`BATTERY_OK` is never posted and nothing triggers; to test it in simulation:
+`uPokeDB targs/targ_remora.moos BATTERY_OK=false`.
+
+```sh
+./launch.sh --sim --pattern=fig8 10                       # simulation
+./launch_vehicle.sh --pattern=fig8 --return_volts=51.0 --ip=100.83.34.69 --shore=<laptop>   # boat
+```
+
 Launcher options worth knowing (`--help` lists all):
 
 | Option | Script | Meaning |

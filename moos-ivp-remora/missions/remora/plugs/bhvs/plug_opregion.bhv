@@ -1,6 +1,10 @@
 //----------------------------------------------
-// Operating region: the Charles River basin in front of the pavilion.
-// Same polygon as the pavlab missions. Leaving it stops the helm.
+// Operating region. box: the Charles River basin in front of the pavilion,
+// same polygon as the pavlab missions. fig8: a rectangle around the pattern
+// (launch_vehicle.sh --op_margin). Leaving the halt zone stops the helm; the
+// save zone turns the boat back first. It is enforced only once the boat
+// has been inside for a second (trigger_on_poly_entry, the default), so a
+// DEPLOY at the dock outside the region does not trip it.
 Behavior = BHV_OpRegionV24
 {
   name      = opreg
@@ -8,7 +12,7 @@ Behavior = BHV_OpRegionV24
   condition = MODE==ACTIVE
   updates   = RECOVER_UPDATES
 
-  core_poly = pts={60,10: -75.54,-54.26: -22,-167: 112,-107}
+  core_poly = $(OPREGION)
 
   save_dist = 5
   halt_dist = 10

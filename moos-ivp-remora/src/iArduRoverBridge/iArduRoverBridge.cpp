@@ -36,6 +36,9 @@ iArduRoverBridge::iArduRoverBridge()
       m_boat_state_stale_sec(5.0),
       m_battery_low_pct(20.0),
       m_battery_low_volts(44.0),
+      m_battery_low_hold_sec(10.0),
+      m_battery_ok(true),
+      m_battery_flip_since(0.0),
       m_last_boat_state_time(0.0),
       m_bms_seen(false),
       m_vcb_seen(false),
@@ -320,6 +323,10 @@ bool iArduRoverBridge::OnStartUp()
         else if (param == "battery_low_volts")
         {
             handled = setNonNegDoubleOnString(m_battery_low_volts, value);
+        }
+        else if (param == "battery_low_hold_sec")
+        {
+            handled = setNonNegDoubleOnString(m_battery_low_hold_sec, value);
         }
         else if (param == "left_motor_servo" || param == "right_motor_servo")
         {
@@ -894,8 +901,23 @@ void iArduRoverBridge::publishBoatState()
             Notify("BATTERY_CELL_MIN", m_bms.cell_min);
             Notify("BATTERY_CELL_SPREAD_MV", (m_bms.cell_max - m_bms.cell_min) * 1000.0);
         }
-        bool ok = good && m_bms.soc > m_battery_low_pct && m_bms.voltage > m_battery_low_volts;
-        Notify("BATTERY_OK", ok ? "true" : "false");
+        // Debounce: the pack sags a few volts in a hard turn and recovers, and
+        // one late BMS reading is not a dead pack. BATTERY_OK flips only after
+        // the raw state has disagreed with it for the hold time.
+        bool raw_ok = good && m_bms.soc > m_battery_low_pct && m_bms.voltage > m_battery_low_volts;
+        if (raw_ok == m_battery_ok)
+            m_battery_flip_since = 0.0;
+        else if (m_battery_flip_since == 0.0)
+            m_battery_flip_since = MOOSTime();
+        else if (MOOSTime() - m_battery_flip_since >= m_battery_low_hold_sec)
+        {
+            m_battery_ok = raw_ok;
+            m_battery_flip_since = 0.0;
+            reportEvent(string("BATTERY_OK -> ") + (raw_ok ? "true" : "false") + " (" +
+                        doubleToStringX(m_bms.soc, 0) + " %, " + doubleToStringX(m_bms.voltage, 2) + " V" +
+                        (good ? ")" : ", BMS data stale)"));
+        }
+        Notify("BATTERY_OK", m_battery_ok ? "true" : "false");
     }
 
     if (!m_vcb_file.empty())
@@ -1295,7 +1317,6 @@ bool iArduRoverBridge::buildReport()
                        << " (file age " << doubleToStringX(m_bms.age, 0) << " s)" << endl;
             else
             {
-                bool ok = m_bms.soc > m_battery_low_pct && m_bms.voltage > m_battery_low_volts;
                 m_msgs << "  Battery: " << doubleToStringX(m_bms.soc, 0) << " %, "
                        << doubleToStringX(m_bms.voltage, 2) << " V, "
                        << doubleToStringX(m_bms.current, 1) << " A, "
@@ -1303,9 +1324,10 @@ bool iArduRoverBridge::buildReport()
                        << doubleToStringX(m_bms.temp, 0) << " C, cells "
                        << doubleToStringX(m_bms.cell_min, 3) << "-"
                        << doubleToStringX(m_bms.cell_max, 3) << " V" << endl;
-                m_msgs << "  BATTERY_OK: " << (ok ? "true" : "FALSE") << " (limits "
+                m_msgs << "  BATTERY_OK: " << (m_battery_ok ? "true" : "FALSE") << " (limits "
                        << doubleToStringX(m_battery_low_pct, 0) << " %, "
-                       << doubleToStringX(m_battery_low_volts, 1) << " V)" << endl;
+                       << doubleToStringX(m_battery_low_volts, 1) << " V, held "
+                       << doubleToStringX(m_battery_low_hold_sec, 0) << " s)" << endl;
             }
         }
         if (!m_vcb_file.empty())

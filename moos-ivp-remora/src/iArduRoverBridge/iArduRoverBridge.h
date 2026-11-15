@@ -79,6 +79,9 @@ private: // Boat state files (empty path = that source is off)
     double m_boat_state_stale_sec;
     double m_battery_low_pct;     // BATTERY_OK goes false at or below this SoC
     double m_battery_low_volts;   // ... or at or below this pack voltage
+    double m_battery_low_hold_sec; // either state must hold this long to flip BATTERY_OK
+    bool   m_battery_ok;           // debounced
+    double m_battery_flip_since;   // MOOSTime the raw state first disagreed, 0 = agrees
     BmsState m_bms;
     VcbState m_vcb;
     double m_last_boat_state_time;

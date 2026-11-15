@@ -1,7 +1,11 @@
 //-------------------------------------------------------------
 // FILE: meta_vehicle.bhv  (nsplug template)
-// A short survey box south of the MIT Sailing Pavilion dock, then
-// return to the start point and station-keep. Coordinates are
+// A survey pattern south of the MIT Sailing Pavilion dock, then return
+// to the start point and station-keep. launch_vehicle.sh --pattern picks
+// the pattern: box (a 40 m square, the default) or fig8 (a smooth
+// figure 8 with no corners). The boat also returns by itself when the
+// bridge reports BATTERY_OK=false (pack under --return_volts or
+// --return_pct for 10 s; never posted where there is no BMS file). Coordinates are
 // metres from the origin in plug_origin_warp.moos. The ArduPilot
 // SITL home in ../../../sim/run_sitl.sh (42.3577, -71.0872) is at
 // about x=20, y=-82 in this frame.
@@ -23,7 +27,7 @@ set MODE = STATION-KEEPING {
 set MODE = RETURNING {
   MODE = ACTIVE
   STATION_KEEP = false
-  RETURN = true
+  (RETURN = true) or (BATTERY_OK = false)
 } SURVEYING
 
 //----------------------------------------------
@@ -37,13 +41,13 @@ Behavior = BHV_Waypoint
   endflag    = RETURN = true
 
              speed = $(SPEED)
-            radius = 5.0
-       slip_radius = 12.0
-              lead = 8
+            radius = $(WPT_RADIUS)
+       slip_radius = $(WPT_SLIP)
+              lead = $(WPT_LEAD)
        lead_damper = 1
      lead_to_start = true
-            points = pts={0,-60:40,-60:40,-100:0,-100}
-            repeat = 0
+            points = $(SURVEY_PTS)
+            repeat = $(SURVEY_REPEAT)
 
     visual_hints = nextpt_color=yellow, nextpt_vertex_size=8
     visual_hints = vertex_color=dodger_blue, edge_color=white
@@ -58,6 +62,9 @@ Behavior = BHV_Waypoint
   condition  = MODE==RETURNING
   perpetual  = true
   updates    = RETURN_UPDATE
+  // Latch: a battery-triggered return stays a return even if the pack
+  // voltage recovers once the load comes off.
+  activeflag = RETURN = true
   endflag    = RETURN = false
   endflag    = STATION_KEEP = true
 

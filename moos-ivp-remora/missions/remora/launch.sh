@@ -53,7 +53,9 @@ for ARGI; do
     elif [ "${ARGI}" = "--sim" -o "${ARGI}" = "-s" ]; then
         VLAUNCH_ARGS+=" --sim"
     elif [ "${ARGI:0:16}" = "--sitl_instance=" -o "${ARGI:0:11}" = "--mav_port=" -o \
-           "${ARGI}" = "--debug" -o "${ARGI}" = "--boat_tcp" -o "${ARGI:0:12}" = "--state_dir=" -o "${ARGI:0:8}" = "--speed=" -o \
+           "${ARGI}" = "--debug" -o "${ARGI}" = "--boat_tcp" -o "${ARGI:0:12}" = "--state_dir=" -o "${ARGI:0:8}" = "--speed=" -o "${ARGI:0:10}" = "--pattern=" -o \
+           "${ARGI:0:7}" = "--fig8_" -o "${ARGI:0:7}" = "--laps=" -o "${ARGI:0:12}" = "--op_margin=" -o \
+           "${ARGI:0:9}" = "--return_" -o \
            "${ARGI:0:10}" = "--max_spd=" -o "${ARGI:0:12}" = "--start_pos=" -o \
            "${ARGI:0:13}" = "--return_pos=" ]; then
         VLAUNCH_ARGS+=" ${ARGI}"

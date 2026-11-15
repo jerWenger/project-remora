@@ -90,6 +90,7 @@ void showExampleConfigAndExit()
   blk("  boat_state_stale_sec = 5   // older file = stale             ");
   blk("  battery_low_pct   = 20     // BATTERY_OK false at or below   ");
   blk("  battery_low_volts = 44     // BATTERY_OK false at or below   ");
+  blk("  battery_low_hold_sec = 10  // ... for this long              ");
   blk("                                                                ");
   blk("  // SERVOn output of each motor, for the report and debug log ");
   blk("  left_motor_servo  = 10                                       ");
