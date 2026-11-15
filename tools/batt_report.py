@@ -164,7 +164,7 @@ def by_speed(a, dis, d, usable, settle, band):
     rows = []
     for k in sorted(set(key[use])):
         m = use & (key == k)
-        if m.sum() < 3:
+        if m.sum() < 15:      # a few readings are a corner or a speed change, not a plateau
             continue
         s, p = float(spd[m].mean()), float(w[m].mean())
         whkm = p / (s * 3.6)

@@ -196,7 +196,10 @@ def verdict(r, P):
         out.append(f"STEERING: no sustained weave ({r['act_rms']:.1f} deg/s rms yaw rate). "
                    f"If corners are cut wide and xtrack settles slowly, raise PSC_VEL_P (now {vel_p:g}) by 0.1.")
     pl = r["plant"]
-    if pl and pl["r2"] > 0.6:
+    if pl and pl["r2"] <= 0.85:
+        out.append(f"RATE FF: plant fit too loose to act on (R2 {pl['r2']:.2f}; a run that mixes speeds or mostly drives "
+                   f"straight does that). Keep ATC_STR_RAT_FF {P.get('ATC_STR_RAT_FF', float('nan')):g}.")
+    elif pl:
         ff, now = 1 / pl["K"], P.get("ATC_STR_RAT_FF", float("nan"))
         note = "keep" if abs(ff - now) / now < 0.15 else f"set {ff:.1f}"
         out.append(f"RATE FF: this run fits {ff:.2f} at {r['speed_mean']:.1f} m/s (now {now:g}): {note}. "

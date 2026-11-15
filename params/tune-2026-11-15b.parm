@@ -1,0 +1,27 @@
+# Third step, from the 2026-11-15 tune mission (log 14: four laps at 1.0 / 1.5 / 2.0 / 2.5 m/s, then
+# zigzag and pivot, with tune-2026-11-15.parm). NOT applied yet. Apply (disarmed):
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-15b.parm --dry-run
+#   .venv/bin/python tools/ap_apply.py params/tune-2026-11-15b.parm
+#
+# What log 14 showed (tools/ap_auto_report.py, tools/batt_report.py):
+#   weave gone: yaw rate on straights 1.6-3.2 deg/s rms (was ~10), motors full-and-opposed 3 % of
+#   the time (was 72 %), steering saturated 1 % (was 71 %). Cross-track on straights 0.3-0.7 m.
+#   speed: 0.98 / 1.49 / 1.97 / 2.47 m/s for 1.0 / 1.5 / 2.0 / 2.5 commanded. Nothing to change.
+#   left over: after each corner the heading rings, ~8 s period: one swing at 2.0-2.5 m/s, three or
+#   four at 1.0 m/s (18 -> 10 -> 12 -> 6 deg/s over ~30 s). In those swings the rate integrator is
+#   as large as the feed-forward and a quarter cycle late: it carries the wind trim of the old
+#   heading (0.2-0.3 steering on some legs today) into the new one, then chases the swing.
+
+# --- steering rate loop: slower, smaller integrator ---------------------------------------------
+ATC_STR_RAT_I,0.5      # was 1.0. Still trims wind in ~10 s; half the lagging push during a swing.
+                       # In the loop model with a sluggish plant: settles in 14 s instead of 25 s
+ATC_STR_RAT_IMAX,0.5   # was 1.0. The largest trim seen today was 0.3; it can no longer wind to full
+
+# --- heading loop, the one Guided / MOOS uses ---------------------------------------------------
+# iArduRoverBridge sends heading + speed in Guided, so the path controller (PSC_VEL_P) is out of the
+# loop and ATC_STR_ANG_P is the heading gain. It is the same kind of gain, in 1/s, around the same
+# yaw lag, and it is still at the 1.0 that weaved in Auto on 2026-11-12. Not yet driven on the water.
+ATC_STR_ANG_P,0.4      # was 1.0. Same margin as PSC_VEL_P 0.3-0.4; raise by 0.1 if MOOS turns feel lazy
+
+# --- mode switch for the MOOS run: uncomment when done with Auto ---------------------------------
+#MODE4,15              # now 10 (Auto). RC6 mid = Guided
